@@ -173,17 +173,21 @@ your-repo/
 
 ## Тестовые данные
 
-Используйте **один из вариантов**:
+### Вариант 1 — Готовый демо-звонок (рекомендуется)
 
-### Вариант 1 — Синтетический звонок (рекомендуется)
+В репозитории лежит готовый тестовый файл: [`audio/call_sample_mtbank.wav`](audio/call_sample_mtbank.wav)
 
-Запишите или синтезируйте диалог 2–4 минуты. Пример сценария в [`docs/sample-dialog.md`](docs/sample-dialog.md).
+- **Длительность:** ~2 мин, 16kHz mono WAV
+- **Содержание:** диалог оператора и клиента о кредите наличными (полный текст в [`docs/sample-dialog.md`](docs/sample-dialog.md))
+- **Внимание:** файл синтезирован через espeak-ng, речь роботизированная. Это осознанный стресс-тест для ASR — если ваш pipeline корректно транскрибирует этот файл, на живой речи качество будет выше
 
-Для синтеза TTS можно использовать:
-- [Silero TTS](https://github.com/snakers4/silero-models) (русский, open-source)
-- [edge-tts](https://github.com/rany2/edge-tts) (бесплатно, русские голоса)
+### Вариант 2 — Собственная запись (для лучшего WER)
 
-### Вариант 2 — Публичные датасеты
+Запишите или синтезируйте диалог 2–4 минуты по сценарию из [`docs/sample-dialog.md`](docs/sample-dialog.md):
+- [Silero TTS](https://github.com/snakers4/silero-models) (русский, open-source, натуральные голоса)
+- [edge-tts](https://github.com/rany2/edge-tts) (бесплатно, русские голоса ru-RU-SvetlanaNeural / ru-RU-DmitryNeural)
+
+### Вариант 3 — Публичные датасеты
 
 - [Russian Open Speech To Text](https://github.com/snakers4/open_stt) — датасет русской речи
 - [Common Voice RU](https://commonvoice.mozilla.org/ru/datasets) — Mozilla, русский язык
@@ -192,7 +196,7 @@ your-repo/
 
 ## Как сдать работу
 
-Отправьте письмо на **hr@mtbank.by** с темой:
+Отправьте письмо на **azubik@mtbank.by** с темой:
 
 ```
 ТЗ AI Engineer — [Ваше Имя Фамилия]
@@ -206,7 +210,7 @@ your-repo/
 
 **Срок:** 5 рабочих дней с момента получения ТЗ.  
 **Обратная связь:** в течение 3 рабочих дней после сдачи.  
-**Вопросы:** tech-hiring@mtbank.by
+**Вопросы:** azubik@mtbank.by
 
 ---
 
@@ -227,8 +231,4 @@ A: Любая публичная платформа: Hetzner, DigitalOcean, Rend
 **Q: Нужна ли реальная речь, или можно TTS?**  
 A: TTS достаточно для демо. Главное — показать что система работает на русском языке.
 
----
 
-<div align="center">
-  <b>ЗАО МТБанк</b> · Минск, пр. Дзержинского, 69 · <a href="https://mtbank.by">mtbank.by</a>
-</div>
