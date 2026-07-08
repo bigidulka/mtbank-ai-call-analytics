@@ -173,23 +173,28 @@ your-repo/
 
 ## Тестовые данные
 
-### Вариант 1 — Готовый демо-звонок (рекомендуется)
+### Вариант 1 — Готовые сэмплы в репозитории (рекомендуется)
 
-В репозитории лежит готовый тестовый файл: [`audio/call_sample_mtbank.wav`](audio/call_sample_mtbank.wav)
+В папке [`audio/samples/`](audio/samples/) лежат **10 записей реальной русской речи** из открытых датасетов (Tinkoff VoiceKit, pisets, Golos/SberDevices).
 
-- **Длительность:** ~2 мин, 16kHz mono WAV
-- **Содержание:** диалог оператора и клиента о кредите наличными (полный текст в [`docs/sample-dialog.md`](docs/sample-dialog.md))
-- **Внимание:** файл синтезирован через espeak-ng, речь роботизированная. Это осознанный стресс-тест для ASR — если ваш pipeline корректно транскрибирует этот файл, на живой речи качество будет выше
+Сэмплы намеренно разнородны — это проверка устойчивости вашего pipeline:
+- разные sample rate (16kHz / 48kHz)
+- разные форматы (WAV / MP3)
+- моно и стерео
+- длительность от 2 до 11 секунд
 
-### Вариант 2 — Собственная запись (для лучшего WER)
+**Прогоните все 10 файлов через ваш ASR и приложите таблицу транскриптов к README** — детали в [`audio/samples/README.md`](audio/samples/README.md).
 
-Запишите или синтезируйте диалог 2–4 минуты по сценарию из [`docs/sample-dialog.md`](docs/sample-dialog.md):
+### Вариант 2 — Синтетический диалог для Multi-Agent демо
+
+Для демонстрации агентов (диалог оператор/клиент) синтезируйте звонок 2–4 минуты по сценарию из [`docs/sample-dialog.md`](docs/sample-dialog.md):
 - [Silero TTS](https://github.com/snakers4/silero-models) (русский, open-source, натуральные голоса)
-- [edge-tts](https://github.com/rany2/edge-tts) (бесплатно, русские голоса ru-RU-SvetlanaNeural / ru-RU-DmitryNeural)
+- [edge-tts](https://github.com/rany2/edge-tts) (бесплатно, голоса ru-RU-SvetlanaNeural / ru-RU-DmitryNeural)
 
 ### Вариант 3 — Публичные датасеты
 
-- [Russian Open Speech To Text](https://github.com/snakers4/open_stt) — датасет русской речи
+- [Golos](https://github.com/salute-developers/golos) — 1240 часов русской речи от SberDevices
+- [Russian Open Speech To Text](https://github.com/snakers4/open_stt) — включая телефонные звонки
 - [Common Voice RU](https://commonvoice.mozilla.org/ru/datasets) — Mozilla, русский язык
 
 ---
