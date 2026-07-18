@@ -1,0 +1,32 @@
+{
+  "metadata": {
+    "policy_id": "quality",
+    "version": "v1",
+    "owner": "MTBank Contact Centre Quality",
+    "effective_date": "2026-07-16"
+  },
+  "criteria": [
+    {
+      "id": "greeting",
+      "weight": 0.25,
+      "description": "Оператор поприветствовал клиента и представился либо обозначил банк."
+    },
+    {
+      "id": "need_detection",
+      "weight": 0.25,
+      "description": "Оператор уточнил цель или существенные детали обращения клиента."
+    },
+    {
+      "id": "solution_provided",
+      "weight": 0.30,
+      "description": "Оператор предложил понятное решение, следующий шаг либо корректное ограничение."
+    },
+    {
+      "id": "farewell",
+      "weight": 0.20,
+      "description": "Оператор корректно завершил разговор."
+    }
+  ],
+  "review_confidence_threshold": 0.75,
+  "role_confidence_threshold": 0.75
+}

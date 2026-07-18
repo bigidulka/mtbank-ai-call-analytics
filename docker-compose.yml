@@ -1,0 +1,556 @@
+name: mtbank-ai-call-analytics
+
+services:
+  secrets-preflight:
+    image: ghcr.io/open-webui/open-webui@sha256:9fcea9c6e32ab60b0498f3986c6cdf651ddbe61db48d2213a3d28048ddd673d4
+    entrypoint:
+      - python
+      - /preflight/validate_runtime_secrets.py
+    command: []
+    environment:
+      PYTHONPATH: /app/src
+      PYTHONDONTWRITEBYTECODE: "1"
+      WEBUI_ADMIN_PASSWORD: ${WEBUI_ADMIN_PASSWORD:?set WEBUI_ADMIN_PASSWORD in .env}
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:?set WEBUI_SECRET_KEY in .env}
+      PIPELINES_API_KEY: ${PIPELINES_API_KEY:?set PIPELINES_API_KEY in .env}
+      MTBANK_ATTACHMENT_SIGNING_KEY: ${MTBANK_ATTACHMENT_SIGNING_KEY:?set MTBANK_ATTACHMENT_SIGNING_KEY in .env}
+      MTBANK_API_KEY: ${MTBANK_API_KEY:?set MTBANK_API_KEY in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GROQ_API_KEY: ${GROQ_API_KEY:?set GROQ_API_KEY in .env}
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./scripts/validate_runtime_secrets.py:/preflight/validate_runtime_secrets.py:ro
+      - ./src/mtbank_ai:/app/src/mtbank_ai:ro
+    mem_limit: 128m
+    pids_limit: 64
+
+  pipelines:
+    image: ghcr.io/open-webui/pipelines@sha256:b48e9bc338ce2be0acfbeff01810db72408a12f07739f9e3879c1f2b00952d6e
+    depends_on:
+      secrets-preflight:
+        condition: service_completed_successfully
+      api:
+        condition: service_healthy
+    working_dir: /app
+    entrypoint:
+      - /bin/bash
+      - -ec
+      - |
+        /app/start.sh --mode setup
+        exec uvicorn auth_wrapper:app --host 0.0.0.0 --port 9099 --forwarded-allow-ips '*' --loop auto --log-level warning --no-access-log
+    command: []
+    environment:
+      PIPELINES_API_KEY: ${PIPELINES_API_KEY:?set PIPELINES_API_KEY in .env}
+      WEBUI_ADMIN_EMAIL: ${WEBUI_ADMIN_EMAIL:?set WEBUI_ADMIN_EMAIL in .env}
+      WEBUI_ADMIN_PASSWORD: ${WEBUI_ADMIN_PASSWORD:?set WEBUI_ADMIN_PASSWORD in .env}
+      MTBANK_ATTACHMENT_SIGNING_KEY: ${MTBANK_ATTACHMENT_SIGNING_KEY:?set MTBANK_ATTACHMENT_SIGNING_KEY in .env}
+      MTBANK_API_KEY: ${MTBANK_API_KEY:?set MTBANK_API_KEY in .env}
+      MTBANK_PIPELINE_PROBE_MODE: "false"
+      PYTHONPATH: /app/src
+      GLOBAL_LOG_LEVEL: "WARNING"
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: localhost,127.0.0.1,::1,api,openwebui,pipelines,gateway
+      no_proxy: localhost,127.0.0.1,::1,api,openwebui,pipelines,gateway
+    expose:
+      - "9099"
+    networks:
+      - pipeline-internal
+      - application-internal
+    volumes:
+      - ./pipeline.py:/app/pipelines/pipeline.py:ro
+      - ./pipelines/auth_wrapper.py:/app/auth_wrapper.py:ro
+      - ./src/mtbank_ai:/app/src/mtbank_ai:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os; from urllib.request import Request, urlopen; request = Request('http://localhost:9099/v1/models', headers={'Authorization': 'Bearer ' + os.environ['PIPELINES_API_KEY']}); urlopen(request, timeout=2).read()\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    mem_limit: 768m
+    pids_limit: 128
+
+  openwebui:
+    image: ghcr.io/open-webui/open-webui@sha256:9fcea9c6e32ab60b0498f3986c6cdf651ddbe61db48d2213a3d28048ddd673d4
+    depends_on:
+      secrets-preflight:
+        condition: service_completed_successfully
+      pipelines:
+        condition: service_healthy
+    working_dir: /app/backend
+    entrypoint:
+      - python
+      - -m
+      - uvicorn
+      - openwebui_wrapper:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --forwarded-allow-ips
+      - "*"
+      - --lifespan
+      - "on"
+      - --log-level
+      - warning
+      - --no-access-log
+    command: []
+    environment:
+      WEBUI_AUTH: "True"
+      ENABLE_SIGNUP: "False"
+      ENABLE_TITLE_GENERATION: "False"
+      ENABLE_FOLLOW_UP_GENERATION: "False"
+      ENABLE_TAGS_GENERATION: "False"
+      ENABLE_OLLAMA_API: "False"
+      USE_OLLAMA_DOCKER: "false"
+      USE_CUDA_DOCKER: "false"
+      WEB_LOADER_ENGINE: requests
+      BYPASS_EMBEDDING_AND_RETRIEVAL: "True"
+      RAG_EMBEDDING_ENGINE: "openai"
+      ENABLE_PERSISTENT_CONFIG: "False"
+      RAG_FILE_MAX_SIZE: "25"
+      USER_PERMISSIONS_CHAT_WEB_UPLOAD: "False"
+      USER_PERMISSIONS_CHAT_STT: "False"
+      USER_PERMISSIONS_CHAT_TTS: "False"
+      USER_PERMISSIONS_CHAT_CALL: "False"
+      USER_PERMISSIONS_FEATURES_WEB_SEARCH: "False"
+      ENABLE_WEB_SEARCH: "False"
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY:?set WEBUI_SECRET_KEY in .env}
+      WEBUI_ADMIN_EMAIL: ${WEBUI_ADMIN_EMAIL:?set WEBUI_ADMIN_EMAIL in .env}
+      WEBUI_ADMIN_PASSWORD: ${WEBUI_ADMIN_PASSWORD:?set WEBUI_ADMIN_PASSWORD in .env}
+      WEBUI_ADMIN_NAME: ${WEBUI_ADMIN_NAME:-MTBank Attachment Probe Admin}
+      OPENAI_API_BASE_URLS: http://pipelines:9099/v1
+      OPENAI_API_KEYS: ${PIPELINES_API_KEY:?set PIPELINES_API_KEY in .env}
+      PYTHONPATH: /app/src
+      GLOBAL_LOG_LEVEL: "WARNING"
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: localhost,127.0.0.1,::1,openwebui,pipelines,gateway
+      no_proxy: localhost,127.0.0.1,::1,openwebui,pipelines,gateway
+    expose:
+      - "8080"
+    networks:
+      - frontend
+      - pipeline-internal
+    volumes:
+      - openwebui-data:/app/backend/data
+      - ./openwebui_wrapper.py:/app/backend/openwebui_wrapper.py:ro
+      - ./src/mtbank_ai:/app/src/mtbank_ai:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail http://localhost:8080/health | grep -q '\"status\":true'"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 20s
+    mem_limit: 1g
+    pids_limit: 256
+
+  gateway:
+    image: nginx@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    depends_on:
+      openwebui:
+        condition: service_healthy
+      model-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${OPENWEBUI_PORT:-3000}:8080"
+    networks:
+      - frontend
+      - gateway-ingress
+      - application-internal
+      - monitoring-internal
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/health | grep -q '\"status\":true'"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    mem_limit: 128m
+    pids_limit: 64
+
+  model-bootstrap:
+    image: ghcr.io/open-webui/open-webui@sha256:9fcea9c6e32ab60b0498f3986c6cdf651ddbe61db48d2213a3d28048ddd673d4
+    depends_on:
+      secrets-preflight:
+        condition: service_completed_successfully
+      openwebui:
+        condition: service_healthy
+    entrypoint:
+      - python
+      - /bootstrap/model_capability_bootstrap.py
+    command: []
+    environment:
+      OPENWEBUI_BOOTSTRAP_URL: http://openwebui:8080
+      WEBUI_ADMIN_EMAIL: ${WEBUI_ADMIN_EMAIL:?set WEBUI_ADMIN_EMAIL in .env}
+      WEBUI_ADMIN_PASSWORD: ${WEBUI_ADMIN_PASSWORD:?set WEBUI_ADMIN_PASSWORD in .env}
+      PYTHONPATH: /bootstrap/src
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: localhost,127.0.0.1,::1,openwebui,pipelines,gateway
+      no_proxy: localhost,127.0.0.1,::1,openwebui,pipelines,gateway
+    networks:
+      - frontend
+    volumes:
+      - ./scripts/model_capability_bootstrap.py:/bootstrap/model_capability_bootstrap.py:ro
+      - ./src/mtbank_ai:/bootstrap/src/mtbank_ai:ro
+    mem_limit: 256m
+    pids_limit: 64
+
+  postgres:
+    image: postgres@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+    depends_on:
+      secrets-preflight:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mtbank_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-mtbank_ai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    expose:
+      - "5432"
+    networks:
+      - application-internal
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    mem_limit: 512m
+    pids_limit: 128
+
+  migrate:
+    image: mtbank-ai-foundation:local
+    depends_on:
+      secrets-preflight:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    command:
+      - alembic
+      - upgrade
+      - head
+    environment:
+      MTBANK_DATABASE__HOST: postgres
+      MTBANK_DATABASE__PORT: "5432"
+      MTBANK_DATABASE__NAME: ${POSTGRES_DB:-mtbank_ai}
+      MTBANK_DATABASE__USER: ${POSTGRES_USER:-mtbank_ai}
+      MTBANK_DATABASE__PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      MTBANK_DATABASE__POOL_SIZE: "5"
+      MTBANK_DATABASE__MAX_OVERFLOW: "10"
+      MTBANK_DATABASE__POOL_TIMEOUT_SECONDS: "2"
+      MTBANK_DATABASE__CONNECT_TIMEOUT_SECONDS: "2"
+      MTBANK_DATABASE__COMMAND_TIMEOUT_SECONDS: "2"
+      MTBANK_DATABASE__READINESS_TIMEOUT_SECONDS: "3"
+    networks:
+      - application-internal
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 64
+
+  api:
+    image: mtbank-ai-foundation:local
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    depends_on:
+      secrets-preflight:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      speech:
+        condition: service_healthy
+    environment:
+      MTBANK_ENVIRONMENT: ${MTBANK_ENVIRONMENT:-production}
+      MTBANK_API__HOST: 0.0.0.0
+      MTBANK_API__PORT: "8000"
+      MTBANK_API__API_KEY: ${MTBANK_API_KEY:?set MTBANK_API_KEY in .env}
+      MTBANK_API__MAX_JSON_BYTES: "1048576"
+      MTBANK_API__MAX_UPLOAD_BYTES: "26214400"
+      MTBANK_API__MULTIPART_RESERVE_BYTES: "65536"
+      MTBANK_API__ALLOWED_MEDIA_TYPES: '["audio/wav","audio/x-wav","audio/mpeg","audio/ogg"]'
+      MTBANK_API__ALLOWED_URL_SCHEMES: '["http","https"]'
+      MTBANK_AGENT_RUNTIME__GATEWAY__BASE_URL: ${MTBANK_AGENT_RUNTIME__GATEWAY__BASE_URL:?set MTBANK_AGENT_RUNTIME__GATEWAY__BASE_URL in .env}
+      MTBANK_AGENT_RUNTIME__GATEWAY__API_KEY: ${MTBANK_AGENT_RUNTIME__GATEWAY__API_KEY:?set MTBANK_AGENT_RUNTIME__GATEWAY__API_KEY in .env}
+      MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__DEFAULT_MODEL: ${MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__DEFAULT_MODEL:?set MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__DEFAULT_MODEL in .env}
+      MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__CLASSIFIER_MODEL: ${MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__CLASSIFIER_MODEL:-}
+      MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__QUALITY_MODEL: ${MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__QUALITY_MODEL:-}
+      MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__COMPLIANCE_MODEL: ${MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__COMPLIANCE_MODEL:-}
+      MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__SUMMARIZER_MODEL: ${MTBANK_AGENT_RUNTIME__GATEWAY__MODELS__SUMMARIZER_MODEL:-}
+      MTBANK_AGENT_RUNTIME__GATEWAY__REQUEST_TIMEOUT_SECONDS: "20"
+      MTBANK_AGENT_RUNTIME__GATEWAY__CONNECT_TIMEOUT_SECONDS: "5"
+      MTBANK_AGENT_RUNTIME__GATEWAY__MAX_CONCURRENCY: "4"
+      MTBANK_AGENT_RUNTIME__GATEWAY__RETRY_MAX_ATTEMPTS: "3"
+      MTBANK_AGENT_RUNTIME__GATEWAY__RETRY_BASE_DELAY_SECONDS: "0.25"
+      MTBANK_AGENT_RUNTIME__GATEWAY__RETRY_MAX_DELAY_SECONDS: "2"
+      MTBANK_AGENT_RUNTIME__GATEWAY__RETRY_MAX_RETRY_AFTER_SECONDS: "5"
+      MTBANK_AGENT_RUNTIME__GATEWAY__CIRCUIT_FAILURE_THRESHOLD: "3"
+      MTBANK_AGENT_RUNTIME__GATEWAY__CIRCUIT_RECOVERY_SECONDS: "10"
+      MTBANK_AGENT_RUNTIME__DEFAULT_MAX_TURNS: "3"
+      MTBANK_AGENT_RUNTIME__DEFAULT_MAX_INPUT_TOKENS: "8000"
+      MTBANK_AGENT_RUNTIME__DEFAULT_MAX_OUTPUT_TOKENS: "2000"
+      MTBANK_AGENT_RUNTIME__DEFAULT_MAX_COST_USD: "1.00"
+      MTBANK_AGENT_RUNTIME__DEFAULT_DEADLINE_SECONDS: "30"
+      MTBANK_AGENT_RUNTIME__MAX_OBSERVATION_BYTES: "16384"
+      MTBANK_SPEECH__MODE: internal_http
+      MTBANK_SPEECH__BASE_URL: http://speech:8010
+      MTBANK_SPEECH__TRANSCRIPTION_PATH: /v1/transcribe
+      MTBANK_SPEECH__STREAMING_PATH: /v1/stream
+      MTBANK_SPEECH__TIMEOUT_SECONDS: "180"
+      MTBANK_WORKFLOW__CODE_SHA: ${MTBANK_WORKFLOW__CODE_SHA:?set MTBANK_WORKFLOW__CODE_SHA in .env}
+      MTBANK_WORKFLOW__PROVIDER_ID: openai-compatible
+      MTBANK_WORKFLOW__DEADLINE_SECONDS: "60"
+      MTBANK_WORKFLOW__MAX_URL_BYTES: "26214400"
+      MTBANK_WORKFLOW__URL_TIMEOUT_SECONDS: "15"
+      MTBANK_WORKFLOW__URL_MAX_REDIRECTS: "3"
+      MTBANK_WORKFLOW__NORMALIZED_SAMPLE_RATE_HZ: "16000"
+      MTBANK_WORKFLOW__NORMALIZED_CHANNELS: "1"
+      MTBANK_WORKFLOW__PRIVACY_MODE: redacted-cloud
+      MTBANK_WORKFLOW__RAW_AUDIO_RETENTION_SECONDS: "0"
+      MTBANK_WORKFLOW__EVIDENCE_RETENTION_DAYS: "30"
+      MTBANK_OBSERVABILITY__ENABLED: "true"
+      MTBANK_OBSERVABILITY__SERVICE_NAME: mtbank-ai-api
+      MTBANK_OBSERVABILITY__METRICS_PATH: /metrics
+      MTBANK_WEBSOCKET__ENABLED: "false"
+      MTBANK_WEBSOCKET__ALLOWED_ORIGINS: '[]'
+      MTBANK_WEBSOCKET__MAX_FRAME_BYTES: "65536"
+      MTBANK_WEBSOCKET__MAX_SESSION_BYTES: "10485760"
+      MTBANK_WEBSOCKET__MAX_UPDATE_TEXT_BYTES: "49152"
+      MTBANK_WEBSOCKET__MAX_DURATION_SECONDS: "300"
+      MTBANK_WEBSOCKET__MAX_SESSIONS: "4"
+      MTBANK_WEBSOCKET__PROCESSING_TIMEOUT_SECONDS: "2"
+      MTBANK_TRENDS__ENABLED: "true"
+      MTBANK_TRENDS__MINIMUM_SAMPLE_SIZE: "5"
+      MTBANK_TRENDS__MAX_WINDOW_DAYS: "90"
+      MTBANK_DATABASE__HOST: postgres
+      MTBANK_DATABASE__PORT: "5432"
+      MTBANK_DATABASE__NAME: ${POSTGRES_DB:-mtbank_ai}
+      MTBANK_DATABASE__USER: ${POSTGRES_USER:-mtbank_ai}
+      MTBANK_DATABASE__PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      MTBANK_DATABASE__POOL_SIZE: "5"
+      MTBANK_DATABASE__MAX_OVERFLOW: "10"
+      MTBANK_DATABASE__POOL_TIMEOUT_SECONDS: "2"
+      MTBANK_DATABASE__CONNECT_TIMEOUT_SECONDS: "2"
+      MTBANK_DATABASE__COMMAND_TIMEOUT_SECONDS: "2"
+      MTBANK_DATABASE__READINESS_TIMEOUT_SECONDS: "3"
+    expose:
+      - "8000"
+    networks:
+      - application-internal
+      - model-egress
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health/ready', timeout=2).read()\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    mem_limit: 512m
+    pids_limit: 128
+
+  speech:
+    image: mtbank-ai-speech-cpu:local
+    build:
+      context: .
+      dockerfile: docker/speech.cpu.Dockerfile
+    environment:
+      MTBANK_SPEECH__RUNTIME__DEVICE: cpu
+      MTBANK_SPEECH__RUNTIME__LANGUAGE: ru
+      MTBANK_SPEECH__RUNTIME__PIPELINE_REVISION: speech/canonical-v1
+      MTBANK_SPEECH__RUNTIME__ROLE_REVIEW_CONFIDENCE_THRESHOLD: "0.75"
+      MTBANK_SPEECH__GROQ__API_KEY: ${GROQ_API_KEY:?set GROQ_API_KEY in .env}
+      MTBANK_SPEECH__GROQ__ENDPOINT: https://api.groq.com/openai/v1/audio/transcriptions
+      MTBANK_SPEECH__GROQ__MODEL: whisper-large-v3-turbo
+      MTBANK_SPEECH__GROQ__LANGUAGE: ru
+      MTBANK_SPEECH__GROQ__TEMPERATURE: "0"
+      MTBANK_SPEECH__GROQ__RESPONSE_FORMAT: verbose_json
+      MTBANK_SPEECH__GROQ__REQUEST_TIMEOUT_SECONDS: "180"
+      MTBANK_SPEECH__GROQ__CONNECT_TIMEOUT_SECONDS: "10"
+      MTBANK_SPEECH__GROQ__MAX_RESPONSE_BYTES: "4194304"
+      MTBANK_SPEECH__RUNTIME__NORMALIZATION_SAMPLE_RATE_HZ: "16000"
+      MTBANK_SPEECH__RUNTIME__NORMALIZATION_CHANNELS: "1"
+      MTBANK_SPEECH__RUNTIME__NORMALIZATION_CODEC: pcm_s16le
+      MTBANK_SPEECH__RUNTIME__MAX_UPLOAD_BYTES: "26214400"
+      MTBANK_SPEECH__RUNTIME__MAX_DURATION_SECONDS: "300"
+      MTBANK_SPEECH__RUNTIME__FFMPEG_TIMEOUT_SECONDS: "30"
+      MTBANK_SPEECH__RUNTIME__REQUEST_TIMEOUT_SECONDS: "180"
+      MTBANK_SPEECH__RUNTIME__MAX_CONCURRENCY: "1"
+      MTBANK_SPEECH__RUNTIME__QUEUE_CAPACITY: "2"
+      MTBANK_SPEECH__RUNTIME__TEMP_ROOT: /tmp/mtbank-speech
+      MTBANK_SPEECH__STREAMING__ENABLED: "false"
+      MTBANK_SPEECH__STREAMING__MAX_SESSION_BYTES: "10485760"
+      MTBANK_SPEECH__STREAMING__MAX_UPDATE_TEXT_BYTES: "49152"
+      MTBANK_SPEECH__STREAMING__ROLLING_WINDOW_SECONDS: "8"
+      MTBANK_SPEECH__STREAMING__ROLLING_STEP_SECONDS: "1.5"
+      MTBANK_SPEECH__STREAMING__ROLLING_CALL_TIMEOUT_SECONDS: "1.5"
+      MTBANK_SPEECH__STREAMING__MAX_ROLLING_CALLS_PER_SESSION: "100"
+      MTBANK_SPEECH__STREAMING__MAX_ROLLING_AUDIO_SECONDS_PER_SESSION: "180"
+      MTBANK_SPEECH__STREAMING__MAX_CONCURRENT_ROLLING_CALLS: "1"
+      MTBANK_SPEECH__STREAMING__PCM_ENERGY_THRESHOLD: "16"
+      MTBANK_SPEECH__MODELS__MANIFEST_PATH: /models/manifest.json
+      MTBANK_SPEECH__MODELS__ARTIFACT_ROOT: /models/artifacts
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      ALL_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
+      all_proxy: ""
+      NO_PROXY: localhost,127.0.0.1,::1,api,speech
+      no_proxy: localhost,127.0.0.1,::1,api,speech
+    expose:
+      - "8010"
+    networks:
+      - application-internal
+      - speech-egress
+    volumes:
+      - ./models:/models:ro
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=256m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8010/health/ready', timeout=2).read()\""]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    mem_limit: 6g
+    pids_limit: 256
+
+  prometheus:
+    image: prom/prometheus:v3.2.1@sha256:5d34817348f69ddb956be509cafa4d4c2b5ecbbb5b786dd99d5a62e686b2ece4
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    expose:
+      - "9090"
+    networks:
+      - application-internal
+      - monitoring-internal
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=32m
+    mem_limit: 256m
+    pids_limit: 64
+
+  tempo:
+    image: grafana/tempo:2.7.1@sha256:f7b6c13b39dfb13a3a79ea52309e8dc280da6a105ee109276d1948432f0d0bc2
+    command:
+      - -config.file=/etc/tempo.yml
+    expose:
+      - "3200"
+      - "4317"
+    networks:
+      - monitoring-internal
+    volumes:
+      - ./monitoring/tempo.yml:/etc/tempo.yml:ro
+    read_only: true
+    tmpfs:
+      - /var/tempo:mode=1777,size=128m
+    mem_limit: 256m
+    pids_limit: 64
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.120.0@sha256:eae362394627e5601e062977c6abb4af830ed8f2d0346a3ec3456a05bd525446
+    command:
+      - --config=/etc/otelcol/config.yml
+    expose:
+      - "4317"
+      - "4318"
+    networks:
+      - monitoring-internal
+    volumes:
+      - ./monitoring/otel-collector.yml:/etc/otelcol/config.yml:ro
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=32m
+    mem_limit: 128m
+    pids_limit: 64
+
+  grafana:
+    image: grafana/grafana:11.5.2@sha256:83b35757385daafca6dbc2134715f932386331dcde02296609ab6123433552f0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_ADMIN_USER: mtbank-observability
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+    expose:
+      - "3000"
+    networks:
+      - monitoring-internal
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/health | grep -Eq '\"database\"[[:space:]]*:[[:space:]]*\"ok\"'"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=64m
+      - /var/lib/grafana:mode=1777,size=64m
+    mem_limit: 256m
+    pids_limit: 128
+
+volumes:
+  openwebui-data:
+  postgres-data:
+
+networks:
+  frontend:
+    internal: true
+  gateway-ingress:
+    internal: false
+  pipeline-internal:
+    internal: true
+  application-internal:
+    internal: true
+  model-egress:
+    internal: false
+  speech-egress:
+    internal: false
+  monitoring-internal:
+    internal: true

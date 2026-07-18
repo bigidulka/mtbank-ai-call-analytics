@@ -1,0 +1,11 @@
+{
+  "diarization": {
+    "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18",
+    "model_id": "pyannote/speaker-diarization-community-1",
+    "model_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+    "package": "pyannote.audio",
+    "package_version": "4.0.7",
+    "relative_path": "diarization"
+  },
+  "schema_version": "2"
+}

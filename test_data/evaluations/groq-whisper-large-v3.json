@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "kind": "external-whisper-wer-baseline",
+  "canonical_speech_path": false,
+  "model": "whisper-large-v3",
+  "language": "ru",
+  "temperature": 0.0,
+  "manifest_sha256": "a520a33d5df53ccd96c2998586711bc865d644492e37d93eb0bfc6f23bc9df08",
+  "files": [
+    {
+      "id": "synthetic-credit-consultation",
+      "audio_sha256": "a44a6a2e22907a1070cc8c0552c6f2871e82141c6c993601fa79b129361f15cd",
+      "reference_sha256": "f7220b6951c586af6a7a7bdd2c72470a5a8de2285cdfdb7f4f1249d019320f52",
+      "hypothesis_sha256": "5c9c2bae425f79416cbed51f4bfa3dc8f19bb130d49c56b04fff4f16c89f933b",
+      "duration_seconds": 239.546,
+      "wer": 0.09722222222222222,
+      "substitutions": 9,
+      "deletions": 24,
+      "insertions": 2,
+      "reference_words": 360
+    },
+    {
+      "id": "synthetic-card-complaint-telephone",
+      "audio_sha256": "ad29510b4c11f5f633580fe14313748da29b315f029c5d738fb4f1ef4f119a6d",
+      "reference_sha256": "e9f440ccd7a49550ea36af4046107613694ab0f27e6b44751b28d87cfabbe9a9",
+      "hypothesis_sha256": "ba4b3e88878f44cde736512bd7a2efc3a7f1eec4e69c0b78029cf97aa891afb7",
+      "duration_seconds": 119.434,
+      "wer": 0.07017543859649122,
+      "substitutions": 6,
+      "deletions": 3,
+      "insertions": 3,
+      "reference_words": 171
+    },
+    {
+      "id": "synthetic-transfer-question",
+      "audio_sha256": "432af16dd0b983ced38020847faa6b5cca4228c62c1a3e3bba7cba81b409ad5c",
+      "reference_sha256": "166e21441c0c0c8f77d3aca5da95af809b2dcdcb1cdf0a1cc1ab19c3185ada54",
+      "hypothesis_sha256": "7c3a1b43a6a8e19b0c39f63c52484aa45f7354880f0a56cad4e7ccb86f170787",
+      "duration_seconds": 114.85,
+      "wer": 0.042682926829268296,
+      "substitutions": 6,
+      "deletions": 0,
+      "insertions": 1,
+      "reference_words": 164
+    },
+    {
+      "id": "synthetic-mobile-app-security",
+      "audio_sha256": "0a6d1cae8fbc5467e95e478d13eeed873cf0c7d121095e64c6227adffff534ef",
+      "reference_sha256": "3431cf137087106ae504bfe2903be0601d0d9b9071bdd4a6108b2f6083379406",
+      "hypothesis_sha256": "410898c3994f40279629482729ae39a9f65c063cacf8792a090017efa23ac504",
+      "duration_seconds": 113.194,
+      "wer": 0.04216867469879518,
+      "substitutions": 4,
+      "deletions": 0,
+      "insertions": 3,
+      "reference_words": 166
+    },
+    {
+      "id": "synthetic-deposit-consultation",
+      "audio_sha256": "868e4f24fbf6fe7603e18f8f2d10cdd552c6d8b236be8e4943d9bcf8e571147e",
+      "reference_sha256": "420a0b2971cb163ddca1415f3b706b65da843303d1706c9e523b3b88e4a75e02",
+      "hypothesis_sha256": "5e0d8a2e927f023bfbbf313a9c7d8ba0108c59e9ae5f3512b4f214d779cef0b5",
+      "duration_seconds": 127.778,
+      "wer": 0.14857142857142858,
+      "substitutions": 6,
+      "deletions": 18,
+      "insertions": 2,
+      "reference_words": 175
+    }
+  ],
+  "micro": {
+    "substitutions": 31,
+    "deletions": 45,
+    "insertions": 11,
+    "reference_words": 1036,
+    "wer": 0.08397683397683398
+  }
+}

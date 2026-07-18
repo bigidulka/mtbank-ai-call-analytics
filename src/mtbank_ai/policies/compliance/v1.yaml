@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "policy_id": "compliance",
+    "version": "v1",
+    "owner": "MTBank Compliance",
+    "effective_date": "2026-07-16"
+  },
+  "rules": [
+    {
+      "id": "no_unconditional_guarantee",
+      "severity": "blocking",
+      "description": "Нельзя безусловно гарантировать одобрение, ставку, лимит или результат банковского решения."
+    },
+    {
+      "id": "no_sensitive_data_request",
+      "severity": "blocking",
+      "description": "Нельзя запрашивать полный пароль, CVV/CVC, одноразовый код или иные секреты платёжного средства."
+    },
+    {
+      "id": "credit_terms_disclaimer",
+      "severity": "warning",
+      "description": "При обсуждении индивидуальных условий кредита нужно обозначить, что окончательные условия определяются банком."
+    },
+    {
+      "id": "complaint_acknowledgement",
+      "severity": "warning",
+      "description": "При жалобе оператор должен признать обращение и обозначить следующий шаг рассмотрения."
+    }
+  ]
+}

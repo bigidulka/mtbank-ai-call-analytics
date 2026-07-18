@@ -1,0 +1,19 @@
+{
+  "schema_version": 2,
+  "artifact_content_digest_schema": "v2",
+  "sources": {
+    "diarization": {
+      "repo_id": "pyannote/speaker-diarization-community-1",
+      "model_id": "pyannote/speaker-diarization-community-1",
+      "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+      "expected_artifact_content_sha256": "03130042c147ab8887d8e6f63ec6dbcc2fd970adfb4930c1cd1bf4d34647ccd4",
+      "license": "CC-BY-4.0",
+      "gated": true,
+      "relative_path": "diarization",
+      "package": {
+        "name": "pyannote.audio",
+        "version": "4.0.7"
+      }
+    }
+  }
+}

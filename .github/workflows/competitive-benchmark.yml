@@ -1,0 +1,25 @@
+name: Competitive benchmark metadata
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  metadata-and-static-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.11"
+      - name: Refresh public metadata without mutating frozen cohort
+        run: python scripts/fetch_competitor_metadata.py --refresh
+      - name: Produce manifest-only static report
+        run: python scripts/analyze_competitors.py --output competitive-analysis.json
+
+# This workflow never downloads, builds, tests, imports, or executes competitor code.
+# Cohort mutation is deliberately unavailable here and requires manual review.

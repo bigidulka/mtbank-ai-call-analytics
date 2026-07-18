@@ -1,0 +1,763 @@
+{
+  "schema": "current-ai-comparison/v1",
+  "scope": "eight current AI-assignment repositories plus local dirty working tree",
+  "execution_policy": "bounded static UTF-8 text scan only; no competitor code executed",
+  "rows": [
+    {
+      "repo": "vbuyel/mtbank-ai-hiring",
+      "sha": "24bc3b92372484ff2b16c19f36f6d6f174d2d08d",
+      "files_seen": 36,
+      "scan_status": "completed",
+      "score_status": "unknown",
+      "comparative_score": null,
+      "verified_points_observed": 67,
+      "verified_bonus_observed": 10,
+      "criteria": [
+        {
+          "id": "pipeline_entry",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "attachment_flow",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "asr",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "diarization_roles",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "llm_tool_trajectories",
+          "status": "partial_verified",
+          "verified_points": 5
+        },
+        {
+          "id": "api_compose",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "security_privacy",
+          "status": "partial_verified",
+          "verified_points": 6
+        },
+        {
+          "id": "persistence",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "observability",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "tests",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "documentation",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ],
+      "bonuses": [
+        {
+          "id": "evaluation_artifacts",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "resilience_controls",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "release_evidence",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ]
+    },
+    {
+      "repo": "Carcajo/mtbank-ai-call-analytics",
+      "sha": "101518c935c18e097bc81957f0184a7464994dd1",
+      "files_seen": 26,
+      "scan_status": "completed",
+      "score_status": "unknown",
+      "comparative_score": null,
+      "verified_points_observed": 62,
+      "verified_bonus_observed": 10,
+      "criteria": [
+        {
+          "id": "pipeline_entry",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "attachment_flow",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "asr",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "diarization_roles",
+          "status": "partial_verified",
+          "verified_points": 5
+        },
+        {
+          "id": "llm_tool_trajectories",
+          "status": "partial_verified",
+          "verified_points": 5
+        },
+        {
+          "id": "api_compose",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "security_privacy",
+          "status": "partial_verified",
+          "verified_points": 6
+        },
+        {
+          "id": "persistence",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "observability",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "tests",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "documentation",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ],
+      "bonuses": [
+        {
+          "id": "evaluation_artifacts",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "resilience_controls",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "release_evidence",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ]
+    },
+    {
+      "repo": "PchelentsovRoman/mtbank-test-assignment",
+      "sha": "6933cac98af6de2d4bdceb16805f9b5852f1bfd1",
+      "files_seen": 4,
+      "scan_status": "completed_without_verified_signals",
+      "score_status": "unknown",
+      "comparative_score": null,
+      "verified_points_observed": 0,
+      "verified_bonus_observed": 0,
+      "criteria": [
+        {
+          "id": "pipeline_entry",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "attachment_flow",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "asr",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "diarization_roles",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "llm_tool_trajectories",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "api_compose",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "security_privacy",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "persistence",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "observability",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "tests",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "documentation",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ],
+      "bonuses": [
+        {
+          "id": "evaluation_artifacts",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "resilience_controls",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "release_evidence",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ]
+    },
+    {
+      "repo": "JustiZzZz/mtbank-ai-transcription",
+      "sha": "31b6565b57fbe1cbd2bf877470cb948221971e95",
+      "files_seen": 87,
+      "scan_status": "completed",
+      "score_status": "unknown",
+      "comparative_score": null,
+      "verified_points_observed": 79,
+      "verified_bonus_observed": 10,
+      "criteria": [
+        {
+          "id": "pipeline_entry",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "attachment_flow",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "asr",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "diarization_roles",
+          "status": "partial_verified",
+          "verified_points": 5
+        },
+        {
+          "id": "llm_tool_trajectories",
+          "status": "partial_verified",
+          "verified_points": 5
+        },
+        {
+          "id": "api_compose",
+          "status": "partial_verified",
+          "verified_points": 5
+        },
+        {
+          "id": "security_privacy",
+          "status": "verified",
+          "verified_points": 12
+        },
+        {
+          "id": "persistence",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "observability",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "tests",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "documentation",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ],
+      "bonuses": [
+        {
+          "id": "evaluation_artifacts",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "resilience_controls",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "release_evidence",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ]
+    },
+    {
+      "repo": "devAsmodeus/mtbank-ai-hiring",
+      "sha": "e170ccdcb9ba8ab26786dc62d6ab5056da701ffd",
+      "files_seen": 70,
+      "scan_status": "completed",
+      "score_status": "unknown",
+      "comparative_score": null,
+      "verified_points_observed": 83,
+      "verified_bonus_observed": 10,
+      "criteria": [
+        {
+          "id": "pipeline_entry",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "attachment_flow",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "asr",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "diarization_roles",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "llm_tool_trajectories",
+          "status": "partial_verified",
+          "verified_points": 5
+        },
+        {
+          "id": "api_compose",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "security_privacy",
+          "status": "partial_verified",
+          "verified_points": 6
+        },
+        {
+          "id": "persistence",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "observability",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "tests",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "documentation",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ],
+      "bonuses": [
+        {
+          "id": "evaluation_artifacts",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "resilience_controls",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "release_evidence",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ]
+    },
+    {
+      "repo": "ib0gdan/speech-analytics",
+      "sha": "3e8a7422d371fd096a3fb04e1d665779c658a112",
+      "files_seen": 60,
+      "scan_status": "completed",
+      "score_status": "unknown",
+      "comparative_score": null,
+      "verified_points_observed": 75,
+      "verified_bonus_observed": 10,
+      "criteria": [
+        {
+          "id": "pipeline_entry",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "attachment_flow",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "asr",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "diarization_roles",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "llm_tool_trajectories",
+          "status": "partial_verified",
+          "verified_points": 5
+        },
+        {
+          "id": "api_compose",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "security_privacy",
+          "status": "partial_verified",
+          "verified_points": 6
+        },
+        {
+          "id": "persistence",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "observability",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "tests",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "documentation",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ],
+      "bonuses": [
+        {
+          "id": "evaluation_artifacts",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "resilience_controls",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "release_evidence",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ]
+    },
+    {
+      "repo": "kutsydanil/AI-Contact-Analytics",
+      "sha": "34c410b990f41365e8909b6a9bd199efb9ece7a8",
+      "files_seen": 4,
+      "scan_status": "completed_without_verified_signals",
+      "score_status": "unknown",
+      "comparative_score": null,
+      "verified_points_observed": 0,
+      "verified_bonus_observed": 0,
+      "criteria": [
+        {
+          "id": "pipeline_entry",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "attachment_flow",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "asr",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "diarization_roles",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "llm_tool_trajectories",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "api_compose",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "security_privacy",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "persistence",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "observability",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "tests",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "documentation",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ],
+      "bonuses": [
+        {
+          "id": "evaluation_artifacts",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "resilience_controls",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "release_evidence",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ]
+    },
+    {
+      "repo": "antonsokol1542-beep/MTBank-AI-Engineer-",
+      "sha": "01862b1a7014b927ac9b56d6e63633071caaf24e",
+      "files_seen": 44,
+      "scan_status": "completed",
+      "score_status": "unknown",
+      "comparative_score": null,
+      "verified_points_observed": 67,
+      "verified_bonus_observed": 10,
+      "criteria": [
+        {
+          "id": "pipeline_entry",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "attachment_flow",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "asr",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "diarization_roles",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "llm_tool_trajectories",
+          "status": "partial_verified",
+          "verified_points": 5
+        },
+        {
+          "id": "api_compose",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "security_privacy",
+          "status": "partial_verified",
+          "verified_points": 6
+        },
+        {
+          "id": "persistence",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "observability",
+          "status": "unknown",
+          "verified_points": null
+        },
+        {
+          "id": "tests",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "documentation",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ],
+      "bonuses": [
+        {
+          "id": "evaluation_artifacts",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "resilience_controls",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "release_evidence",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ]
+    },
+    {
+      "repo": "local-working-tree",
+      "sha": null,
+      "files_seen": 218,
+      "scan_status": "completed",
+      "score_status": "unknown",
+      "comparative_score": null,
+      "verified_points_observed": 94,
+      "verified_bonus_observed": 10,
+      "criteria": [
+        {
+          "id": "pipeline_entry",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "attachment_flow",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "asr",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "diarization_roles",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "llm_tool_trajectories",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "api_compose",
+          "status": "verified",
+          "verified_points": 10
+        },
+        {
+          "id": "security_privacy",
+          "status": "verified",
+          "verified_points": 12
+        },
+        {
+          "id": "persistence",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "observability",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "tests",
+          "status": "verified",
+          "verified_points": 8
+        },
+        {
+          "id": "documentation",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ],
+      "bonuses": [
+        {
+          "id": "evaluation_artifacts",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "resilience_controls",
+          "status": "verified",
+          "verified_points": 5
+        },
+        {
+          "id": "release_evidence",
+          "status": "unknown",
+          "verified_points": null
+        }
+      ]
+    }
+  ]
+}

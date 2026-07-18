@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "kind": "live-websocket-provisional-latency",
+  "route": "/ws/transcribe",
+  "provider": "groq-whisper-large-v3-turbo",
+  "canonical_reconciliation_executed": false,
+  "audio_sha256": "ba6c0c2c944c54b3b42fb46a711cd83e2ddcb466bdec4586368171e04d7e28e5",
+  "audio_seconds": 30.0,
+  "frame_seconds": 0.5,
+  "frames_sent": 60,
+  "updates": 4,
+  "p50_seconds": 0.4274761150008999,
+  "p95_seconds": 0.5181055319844745,
+  "max_seconds": 0.5181055319844745,
+  "observations": [
+    {
+      "sequence": 3,
+      "kind": "partial",
+      "latency_seconds": 0.4396031459909864,
+      "text_sha256": "86bae2ef29ad19e7639c23df8c97745a98534910c8705016e228057374b7e7b7",
+      "text_bytes": 22
+    },
+    {
+      "sequence": 6,
+      "kind": "partial",
+      "latency_seconds": 0.34029371599899605,
+      "text_sha256": "86bae2ef29ad19e7639c23df8c97745a98534910c8705016e228057374b7e7b7",
+      "text_bytes": 22
+    },
+    {
+      "sequence": 9,
+      "kind": "partial",
+      "latency_seconds": 0.4274761150008999,
+      "text_sha256": "f60dac9d5199f2a27eee474eb70ce900dfb7afe5b7bfb2dea7aa28fbdf347d1e",
+      "text_bytes": 57
+    },
+    {
+      "sequence": 12,
+      "kind": "partial",
+      "latency_seconds": 0.5181055319844745,
+      "text_sha256": "d4e4b9157a329b7a0dcff5559d95405c1f50d81d025e9eaa39135f891fa1228d",
+      "text_bytes": 97
+    }
+  ]
+}

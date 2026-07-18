@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "policy_id": "taxonomy",
+    "version": "v1",
+    "owner": "MTBank Contact Centre",
+    "effective_date": "2026-07-16"
+  },
+  "topics": [
+    {
+      "id": "кредиты",
+      "description": "Кредитные продукты, условия, ставки, заявки и платежи.",
+      "allowed_priorities": ["low", "medium", "high"]
+    },
+    {
+      "id": "карты",
+      "description": "Банковские карты, выпуск, обслуживание, блокировка и операции по карте.",
+      "allowed_priorities": ["low", "medium", "high"]
+    },
+    {
+      "id": "переводы",
+      "description": "Переводы, зачисления, реквизиты и статусы платежей.",
+      "allowed_priorities": ["low", "medium", "high"]
+    },
+    {
+      "id": "жалобы",
+      "description": "Жалобы, претензии, негативный клиентский опыт и эскалации.",
+      "allowed_priorities": ["medium", "high"]
+    },
+    {
+      "id": "другое",
+      "description": "Обращение не относится к утверждённым темам.",
+      "allowed_priorities": ["low", "medium"]
+    }
+  ]
+}

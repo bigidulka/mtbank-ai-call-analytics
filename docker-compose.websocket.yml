@@ -1,0 +1,9 @@
+services:
+  api:
+    environment:
+      MTBANK_WEBSOCKET__ENABLED: "true"
+      MTBANK_WEBSOCKET__ALLOWED_ORIGINS: '["${MTBANK_WEBSOCKET_ALLOWED_ORIGIN:?set MTBANK_WEBSOCKET_ALLOWED_ORIGIN in .env}"]'
+
+  speech:
+    environment:
+      MTBANK_SPEECH__STREAMING__ENABLED: "true"

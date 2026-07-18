@@ -1,0 +1,128 @@
+{
+  "metadata": {
+    "policy_id": "roles",
+    "version": "v1",
+    "owner": "MTBank Contact Centre Operations",
+    "effective_date": "2026-07-17"
+  },
+  "signals": {
+    "operator": [
+      {
+        "id": "service_identity",
+        "weight": 5.0,
+        "phrases": [
+          "мтбанк",
+          "служба поддержки",
+          "контакт центр",
+          "оператор",
+          "меня зовут",
+          "чем могу помочь",
+          "слушаю вас"
+        ]
+      },
+      {
+        "id": "service_guidance",
+        "weight": 2.5,
+        "phrases": [
+          "подскажите",
+          "уточните",
+          "пожалуйста",
+          "не сообщайте",
+          "не называйте",
+          "не пересылайте",
+          "откройте",
+          "проверьте",
+          "обратитесь",
+          "зарегистрирую",
+          "зафиксирую"
+        ]
+      },
+      {
+        "id": "service_explanation",
+        "weight": 2.0,
+        "phrases": [
+          "доступно",
+          "зависит",
+          "отображается",
+          "обычно",
+          "необходимо",
+          "сотрудники банка",
+          "обращение",
+          "проверка",
+          "приложение"
+        ]
+      },
+      {
+        "id": "service_closing",
+        "weight": 2.0,
+        "phrases": [
+          "есть ли у вас еще вопросы",
+          "спасибо за обращение",
+          "до свидания",
+          "хорошего дня"
+        ]
+      }
+    ],
+    "client": [
+      {
+        "id": "intent_or_question",
+        "weight": 3.0,
+        "phrases": [
+          "хочу",
+          "мне",
+          "можно ли",
+          "нужно ли",
+          "сколько",
+          "какой",
+          "какая",
+          "какие",
+          "как",
+          "почему"
+        ]
+      },
+      {
+        "id": "personal_context",
+        "weight": 2.0,
+        "phrases": [
+          "я уже",
+          "я ничего",
+          "я пытался",
+          "я получу",
+          "я могу",
+          "я сначала",
+          "я начну",
+          "я не",
+          "у меня",
+          "мне позвонили",
+          "перевел"
+        ]
+      },
+      {
+        "id": "acknowledgement_or_intent",
+        "weight": 1.5,
+        "phrases": [
+          "понял",
+          "понятно",
+          "спасибо",
+          "буду ждать",
+          "подожду"
+        ]
+      }
+    ]
+  },
+  "thresholds": {
+    "minimum_operator_score": 5.0,
+    "minimum_client_score": 3.0,
+    "minimum_full_assignment_margin": 3.0,
+    "supported_automatic_total_speakers": 2,
+    "review_confidence_threshold": 0.75
+  },
+  "confidence": {
+    "minimum": 0.5,
+    "maximum": 1.0,
+    "score_scale": 8.0,
+    "margin_scale": 6.0,
+    "score_weight": 0.5,
+    "margin_weight": 0.5
+  }
+}

@@ -1,0 +1,1 @@
+"""Internal-only FastAPI transport."""

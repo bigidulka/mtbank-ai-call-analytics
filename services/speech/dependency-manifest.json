@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "speech_runtime": {
+    "groq": {
+      "provider": "groq",
+      "endpoint": "https://api.groq.com/openai/v1/audio/transcriptions",
+      "model": "whisper-large-v3-turbo",
+      "protocol": "openai-compatible"
+    },
+    "pyannote_audio": {
+      "package": "pyannote.audio",
+      "version": "4.0.7",
+      "model_id": "pyannote/speaker-diarization-community-1"
+    },
+    "torch": {
+      "package": "torch",
+      "version": "2.8.0"
+    }
+  },
+  "release_compatibility_gate": "Run a controlled Groq plus local pyannote Community-1 E2E only after the gated artifact, Groq credential approval, and privacy review are available."
+}

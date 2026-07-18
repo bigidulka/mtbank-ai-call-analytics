@@ -1,0 +1,19 @@
+services:
+  speech:
+    image: mtbank-ai-speech-gpu:local
+    build:
+      context: .
+      dockerfile: docker/speech.gpu.Dockerfile
+    profiles:
+      - gpu
+    environment:
+      MTBANK_SPEECH__RUNTIME__DEVICE: cuda
+      MTBANK_SPEECH__RUNTIME__COMPUTE_TYPE: float16
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu

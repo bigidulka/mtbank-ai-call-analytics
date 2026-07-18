@@ -1,0 +1,14 @@
+{
+  "schema_version": "1",
+  "purpose": "Release gates that must be evidenced; synthetic fixtures never satisfy these gates.",
+  "gates": [
+    {"id": "licensed_corpus", "evidence": "MTBANK_LICENSED_CORPUS_MANIFEST with licensed speech, reference transcript and role labels"},
+    {"id": "local_model_artifacts", "evidence": "models/manifest.json plus immutable local artifacts"},
+    {"id": "cloud_gateway_credentials", "evidence": "configured HTTPS cloud gateway, key and model ID"},
+    {"id": "real_agent_traces", "evidence": "release-evidence/real-agent-traces.json"},
+    {"id": "gpu_benchmark", "evidence": "release-evidence/gpu-benchmark.json"},
+    {"id": "grafana_browser_proof", "evidence": "release-evidence/grafana-browser-proof.json"},
+    {"id": "websocket_gpu_p95", "evidence": "release-evidence/websocket-gpu-p95.json"},
+    {"id": "canonical_app_image", "evidence": "release-evidence/canonical-app-image.json"}
+  ]
+}
