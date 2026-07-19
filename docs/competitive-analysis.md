@@ -39,7 +39,7 @@ Workflow `.github/workflows/competitive-benchmark.yml` выполняет тол
 
 При извлечении принимались только regular files допустимых text-типов: archive ≤25 MiB, file ≤1 MiB, text tree ≤16 MiB, ≤10 000 archive members и ≤5 000 text files. Symlink, hardlink, device, traversal, binary/non-UTF-8 и LFS pointer не извлекались. Код конкурентов не клонировался, не импортировался, не собирался и не исполнялся.
 
-Candidate использует immutable SHA `18c81880b0b2ef318eb0c00ec3e9020381678e63` и дал 94 `verified_points_observed` и 10 bonus points при 280 просмотренных подходящих файлах (`commit_status: clean_git_sha`). Доказательство release image отсутствует, поэтому его `comparative_score` остаётся `null`, а `score_status` — `unknown`. У всех 44 competitors `comparative_score` также `null`: observed points — не ранжирование, а отсутствие безопасного архива остаётся `unknown`.
+Candidate использует immutable SHA `18c81880b0b2ef318eb0c00ec3e9020381678e63` и дал 94 `verified_points_observed` и 10 bonus points при 280 просмотренных подходящих файлах (`commit_status: clean_git_sha`). Его `comparative_score` остаётся `null`, а `score_status` — `unknown` исключительно потому, что отсутствуют release image evidence и release attestation, а не из-за uncommitted tree. У всех 44 competitors `comparative_score` также `null`: observed points — не ранжирование, а отсутствие безопасного архива остаётся `unknown`.
 
 Machine-readable final report: `artifacts/competitive-analysis-final.json`.
 
@@ -51,7 +51,7 @@ Machine-readable final report: `artifacts/competitive-analysis-final.json`.
 
 | Репозиторий | SHA | Static verified | Static bonus | Основные не найденные signals |
 |---|---|---:|---:|---|
-| **candidate** | `18c81880b0b2ef318eb0c00ec3e9020381678e63` | **94** | **10** | отсутствует release image evidence и documentation attestation |
+| **candidate** | `18c81880b0b2ef318eb0c00ec3e9020381678e63` (`clean_git_sha`) | **94** | **10** | release image evidence и release attestation отсутствуют; score остаётся `null` |
 | `devAsmodeus/mtbank-ai-hiring` | `e170ccd` | 83 | 10 | полная tool trajectory, вторая половина security/privacy |
 | `JustiZzZz/mtbank-ai-transcription` | `31b6565` | 79 | 10 | role-resolution половина, tool trajectory, Compose половина |
 | `ib0gdan/speech-analytics` | `3e8a742` | 75 | 10 | tool trajectory, privacy половина, persistence |
@@ -63,4 +63,4 @@ Machine-readable final report: `artifacts/competitive-analysis-final.json`.
 
 Machine-readable result: `artifacts/competitive-analysis-current.json`.
 
-Удалённый `vbuyel/mtbank-ai-hiring` отражает commit `24bc3b9`, а не candidate `18c81880b0b2ef318eb0c00ec3e9020381678e63`. Candidate уже идентифицирован этим immutable SHA и прошёл ту же rubric в static-only контуре. Итоговый рейтинг по-прежнему нельзя объявлять: release image evidence отсутствует, поэтому `comparative_score` остаётся `null` и `score_status` — `unknown`.
+Удалённый `vbuyel/mtbank-ai-hiring` отражает commit `24bc3b9`, а не candidate `18c81880b0b2ef318eb0c00ec3e9020381678e63`. Candidate уже идентифицирован этим immutable SHA (`commit_status: clean_git_sha`) и прошёл ту же rubric в static-only контуре. Итоговый рейтинг по-прежнему нельзя объявлять исключительно из-за отсутствующих release image evidence и release attestation, а не из-за uncommitted tree: `comparative_score` остаётся `null`, `score_status` — `unknown`.

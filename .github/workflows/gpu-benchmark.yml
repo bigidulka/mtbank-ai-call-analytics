@@ -27,6 +27,8 @@ jobs:
           test -n "$MTBANK_API_KEY"
           test -n "$MTBANK_GPU_BENCHMARK_WEBSOCKET_URL"
           test -n "$MTBANK_GPU_BENCHMARK_ORIGIN"
+      - name: Build GPU speech image from this checkout
+        run: docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile gpu build speech
       - name: Run observed NVIDIA WebSocket workload
         run: |
           image_digest="$(docker image inspect --format '{{.Id}}' mtbank-ai-speech-gpu:local)"

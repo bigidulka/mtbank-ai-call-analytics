@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import httpx
 import pytest
 
+import scripts.evaluate_canonical_speech as canonical_evaluator
 from mtbank_ai.speech.dataset import ManifestEntry
 from scripts.evaluate_canonical_speech import CanonicalEvaluationFailure, _endpoint, _evaluate_entry
 
@@ -44,6 +46,33 @@ def test_canonical_evaluator_uses_fixed_transcribe_path_and_declared_mime(tmp_pa
 def test_canonical_evaluator_rejects_noncanonical_base_url(base_url: str) -> None:
     with pytest.raises(ValueError):
         _endpoint(base_url)
+
+
+def test_canonical_evaluator_disables_environment_proxies(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    manifest = tmp_path / "manifest.yaml"
+    manifest.write_text("fixtures: []\n", encoding="utf-8")
+    client_options: dict[str, object] = {}
+
+    class Client:
+        def __init__(self, **kwargs: object) -> None:
+            client_options.update(kwargs)
+
+        def __enter__(self) -> Client:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(canonical_evaluator, "validate_manifest", lambda *_args, **_kwargs: ())
+    monkeypatch.setattr(canonical_evaluator.httpx, "Client", Client)
+
+    status, result = canonical_evaluator.evaluate(
+        argparse.Namespace(manifest=manifest, base_url="http://speech.test", timeout_seconds=12.5)
+    )
+
+    assert status == 0
+    assert result["status"] == "completed"
+    assert client_options == {"timeout": 12.5, "follow_redirects": False, "trust_env": False}
 
 
 def test_canonical_evaluator_reports_role_resolution_failure_without_parsing_body(tmp_path: Path) -> None:

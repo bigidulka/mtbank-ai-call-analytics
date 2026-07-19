@@ -38,7 +38,7 @@
 
 - Groq multipart/response-bound/no-fallback and deterministic overlap contracts are unit
   tested. Real external Groq ASR baseline on five synthetic files (714.802 s, 1 036
-  reference words) measured micro WER 8.0116%; it is ASR-only and not canonical
+  reference words) measured micro WER 8.39768%; it is ASR-only and not canonical
   Groq+pyannote release evidence. A repeated sequential Groq-only script took 5.493 s
   wall time, not canonical Groq+pyannote latency.
 - Community-1 revision `3533c8cf8e369892e6b79ff1bf80f7b0286a54ee` is provisioned with

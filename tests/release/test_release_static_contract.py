@@ -30,6 +30,7 @@ def test_ci_has_offline_real_and_gpu_release_jobs() -> None:
     assert "workflow_dispatch:" in gpu
     assert "self-hosted" in gpu
     assert "run_gpu_speech_benchmark.py" in gpu
+    assert "docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile gpu build speech" in gpu
     assert "docker image inspect" in gpu
     assert "Validate generated GPU evidence for this checkout" in gpu
     assert "websocket-gpu-p95.json" in gpu
@@ -103,6 +104,10 @@ def test_dockerfiles_and_operations_document_hashed_wheelhouse_contract() -> Non
     assert "cp /secure/reviewed-wheelhouse/*.whl docker/wheelhouse/" in operations
     assert "--build-arg USE_WHEELHOUSE=1" in operations
     assert "check_release_gate.py --allow-blocked" in operations
+    assert (
+        "docker compose --env-file tmp/release-ci.env -f docker-compose.yml -f docker-compose.gpu.yml "
+        "--profile gpu config --quiet"
+    ) in operations
     assert "diagnostic only" in operations
     assert "external CI/runtime artifact" in operations
 

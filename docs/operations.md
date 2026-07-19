@@ -25,7 +25,7 @@ CPU compose validation uses only synthetic `.env` values and never downloads mod
 
 ```bash
 docker compose --env-file tmp/release-ci.env config --quiet
-docker compose --env-file tmp/release-ci.env -f docker-compose.yml -f docker-compose.gpu.yml config --quiet
+docker compose --env-file tmp/release-ci.env -f docker-compose.yml -f docker-compose.gpu.yml --profile gpu config --quiet
 ```
 
 The canonical app image uses frozen `uv.lock`. If PyPI is unavailable, do not weaken
