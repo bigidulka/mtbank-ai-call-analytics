@@ -25,7 +25,7 @@ python scripts/analyze_competitors.py --sources-dir /safe/prefetched --candidate
 
 `evals/competitors/rubric.yaml` определяет единый максимум 100 + 15 бонусных баллов для конкурентов и кандидата. Проверяемые сигналы охватывают Pipeline, вложения, ASR, diarization/roles, независимые LLM/tool trajectories, API/Compose, security/privacy, persistence, observability, тесты, документацию и бонусы. Частичные баллы возможны только для пар независимых сигналов, по явно заданному правилу rubric. Документация не получает static verified points: prose остаётся claim-only, а независимая аттестация нужна для её учёта.
 
-`unknown`, `claim_only` и `out_of_scope` не равны нулю и не добавляют verified points. Даже накопленные `verified_points_observed` не являются рейтингом. `comparative_score` остаётся `null`, пока все применимые критерии не подтверждены статически/аттестацией, а кандидат не имеет immutable release SHA и доказательства образа. Поэтому даже при безопасно доступных исходниках все записи сохраняют `score_status: unknown`; недоступный или отклонённый архив не доказывает отсутствие реализации.
+`unknown`, `claim_only` и `out_of_scope` не равны нулю и не добавляют verified points. Даже накопленные `verified_points_observed` не являются рейтингом. `comparative_score` остаётся `null`, пока все применимые критерии не подтверждены статически/аттестацией, а кандидат не имеет одновременно immutable release SHA и доказательства образа. Поэтому даже при безопасно доступных исходниках все записи сохраняют `score_status: unknown`; недоступный или отклонённый архив не доказывает отсутствие реализации.
 
 ## Обновление метаданных и ограничения
 
@@ -39,7 +39,7 @@ Workflow `.github/workflows/competitive-benchmark.yml` выполняет тол
 
 При извлечении принимались только regular files допустимых text-типов: archive ≤25 MiB, file ≤1 MiB, text tree ≤16 MiB, ≤10 000 archive members и ≤5 000 text files. Symlink, hardlink, device, traversal, binary/non-UTF-8 и LFS pointer не извлекались. Код конкурентов не клонировался, не импортировался, не собирался и не исполнялся.
 
-Локальный working tree дал 94 `verified_points_observed` и 10 bonus points при 280 просмотренных подходящих файлах, но имеет `commit_status: uncommitted`; его `comparative_score` остаётся `null`. У всех 44 competitors `comparative_score` также `null`: observed points — не ранжирование, а отсутствие безопасного архива остаётся `unknown`.
+Candidate использует immutable SHA `18c81880b0b2ef318eb0c00ec3e9020381678e63` и дал 94 `verified_points_observed` и 10 bonus points при 280 просмотренных подходящих файлах (`commit_status: clean_git_sha`). Доказательство release image отсутствует, поэтому его `comparative_score` остаётся `null`, а `score_status` — `unknown`. У всех 44 competitors `comparative_score` также `null`: observed points — не ранжирование, а отсутствие безопасного архива остаётся `unknown`.
 
 Machine-readable final report: `artifacts/competitive-analysis-final.json`.
 
@@ -51,7 +51,7 @@ Machine-readable final report: `artifacts/competitive-analysis-final.json`.
 
 | Репозиторий | SHA | Static verified | Static bonus | Основные не найденные signals |
 |---|---|---:|---:|---|
-| **local working tree** | uncommitted | **94** | **10** | только documentation attestation и immutable release evidence |
+| **candidate** | `18c81880b0b2ef318eb0c00ec3e9020381678e63` | **94** | **10** | отсутствует release image evidence и documentation attestation |
 | `devAsmodeus/mtbank-ai-hiring` | `e170ccd` | 83 | 10 | полная tool trajectory, вторая половина security/privacy |
 | `JustiZzZz/mtbank-ai-transcription` | `31b6565` | 79 | 10 | role-resolution половина, tool trajectory, Compose половина |
 | `ib0gdan/speech-analytics` | `3e8a742` | 75 | 10 | tool trajectory, privacy половина, persistence |
@@ -63,4 +63,4 @@ Machine-readable final report: `artifacts/competitive-analysis-final.json`.
 
 Machine-readable result: `artifacts/competitive-analysis-current.json`.
 
-Удалённый `vbuyel/mtbank-ai-hiring` отражает commit `24bc3b9`, а не текущий локальный код. После commit/push текущая реализация должна заменить его как candidate и пройти ту же rubric по immutable SHA. Текущий локальный результат нельзя объявлять итоговым рейтингом, пока working tree uncommitted и нет image/release attestation.
+Удалённый `vbuyel/mtbank-ai-hiring` отражает commit `24bc3b9`, а не candidate `18c81880b0b2ef318eb0c00ec3e9020381678e63`. Candidate уже идентифицирован этим immutable SHA и прошёл ту же rubric в static-only контуре. Итоговый рейтинг по-прежнему нельзя объявлять: release image evidence отсутствует, поэтому `comparative_score` остаётся `null` и `score_status` — `unknown`.
