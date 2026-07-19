@@ -11,10 +11,14 @@ from services.speech.manifest import SpeechModelManifest
 ROOT = Path(__file__).parents[3]
 
 
-def test_model_sources_only_require_pinned_local_community_one() -> None:
+def test_model_sources_require_pinned_local_asr_and_community_one() -> None:
     sources = provisioning.load_model_sources(ROOT / "services" / "speech" / "model-sources.json")
 
-    assert tuple(sources.sources) == ("diarization",)
+    assert tuple(sources.sources) == ("asr", "diarization")
+    asr = sources.sources["asr"]
+    assert asr.model_id == "dropbox-dash/faster-whisper-large-v3-turbo"
+    assert asr.package.name == "faster-whisper"
+    assert asr.gated is False
     source = sources.sources["diarization"]
     assert source.repo_id == "pyannote/speaker-diarization-community-1"
     assert source.model_id == "pyannote/speaker-diarization-community-1"
@@ -58,9 +62,18 @@ def test_provisioning_fails_closed_before_hub_access_without_reviewed_diarizatio
     assert not (tmp_path / "manifest.json").exists()
 
 
-def test_diarization_only_manifest_rejects_legacy_asr_and_alignment_fields() -> None:
+def test_complete_local_manifest_rejects_legacy_alignment_field() -> None:
+    artifact = {
+        "package": "faster-whisper",
+        "package_version": "1.2.1",
+        "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+        "model_revision": "a" * 40,
+        "relative_path": "asr",
+        "artifact_sha256": "b" * 64,
+    }
     payload = {
-        "schema_version": "2",
+        "schema_version": "3",
+        "asr": artifact,
         "diarization": {
             "package": "pyannote.audio",
             "package_version": "4.0.7",
@@ -69,7 +82,6 @@ def test_diarization_only_manifest_rejects_legacy_asr_and_alignment_fields() -> 
             "relative_path": "diarization",
             "artifact_sha256": "b" * 64,
         },
-        "asr": {"unexpected": True},
         "alignment": {"unexpected": True},
     }
 
@@ -77,7 +89,7 @@ def test_diarization_only_manifest_rejects_legacy_asr_and_alignment_fields() -> 
         SpeechModelManifest.model_validate(payload)
 
 
-def test_provision_cli_only_accepts_diarization_component() -> None:
+def test_provision_cli_accepts_asr_and_diarization_components() -> None:
     parsed = provisioning._parse_arguments(
         (
             "--artifact-root",
@@ -92,16 +104,16 @@ def test_provision_cli_only_accepts_diarization_component() -> None:
     )
 
     assert parsed.component == ["diarization"]
-    with pytest.raises(SystemExit):
-        provisioning._parse_arguments(
-            (
-                "--artifact-root",
-                "artifacts",
-                "--output-manifest",
-                "manifest.json",
-                "--cache-dir",
-                "cache",
-                "--component",
-                "asr",
-            )
+    asr = provisioning._parse_arguments(
+        (
+            "--artifact-root",
+            "artifacts",
+            "--output-manifest",
+            "manifest.json",
+            "--cache-dir",
+            "cache",
+            "--component",
+            "asr",
         )
+    )
+    assert asr.component == ["asr"]

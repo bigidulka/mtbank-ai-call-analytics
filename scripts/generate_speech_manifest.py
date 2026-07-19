@@ -9,7 +9,7 @@ from pathlib import Path
 
 from services.speech.manifest import ModelArtifact, SpeechModelManifest, artifact_tree_sha256
 
-_COMPONENTS = ("diarization",)
+_COMPONENTS = ("asr", "diarization")
 
 
 def _component(arguments: argparse.Namespace, name: str, root: Path) -> ModelArtifact:
@@ -29,7 +29,10 @@ def _component(arguments: argparse.Namespace, name: str, root: Path) -> ModelArt
 
 def generate(arguments: argparse.Namespace) -> SpeechModelManifest:
     root = arguments.artifact_root.resolve()
-    return SpeechModelManifest(diarization=_component(arguments, "diarization", root))
+    return SpeechModelManifest(
+        asr=_component(arguments, "asr", root),
+        diarization=_component(arguments, "diarization", root),
+    )
 
 
 def _add_component_arguments(parser: argparse.ArgumentParser, name: str) -> None:

@@ -170,7 +170,7 @@ def _evaluate_entry(client: httpx.Client, endpoint: str, entry: ManifestEntry) -
     if response.status_code != 200:
         raise CanonicalEvaluationFailure(status_code=response.status_code, reason="canonical_service_failure")
     try:
-        canonical = SpeechTranscriptionResponse.model_validate(response.json())
+        canonical = SpeechTranscriptionResponse.model_validate_json(response.content)
     except (ValueError, TypeError) as error:
         raise CanonicalEvaluationFailure(status_code=200, reason="invalid_canonical_response") from error
     reference = load_segments(entry.root / str(entry.raw["reference_path"]))

@@ -21,7 +21,7 @@ from services.speech.errors import (
 )
 from services.speech.manifest import ModelRegistry
 from services.speech.media import MediaLimits, MediaNormalizer
-from services.speech.settings import GroqTranscriptionSettings, SpeechRuntimeSettings, SpeechSettings
+from services.speech.settings import FasterWhisperSettings, SpeechRuntimeSettings, SpeechSettings
 from services.speech.streaming import ProductionStreamingSpeechAdapter
 
 
@@ -38,7 +38,7 @@ class StreamingRuntimePort(Protocol):
 
 
 EngineFactory = Callable[
-    [ModelRegistry, SpeechRuntimeSettings, GroqTranscriptionSettings, RoleResolverPort | None],
+    [ModelRegistry, SpeechRuntimeSettings, FasterWhisperSettings, RoleResolverPort | None],
     CanonicalBatchEngine,
 ]
 
@@ -135,7 +135,7 @@ class LazySpeechRuntime:
                 self._engine = self._engine_factory(
                     self._registry,
                     self._settings.runtime,
-                    self._settings.groq,
+                    self._settings.faster_whisper,
                     self._role_resolver,
                 )
             return self._engine
@@ -145,10 +145,13 @@ class LazySpeechRuntime:
             if self._streaming is None:
                 if not await asyncio.to_thread(self._registry.verify_ready):
                     raise SpeechConfigurationError("local speech model artifacts are not ready")
+                groq = self._settings.groq
+                if groq is None:
+                    raise SpeechConfigurationError("Groq configuration is required for opt-in streaming")
                 self._streaming = ProductionStreamingSpeechAdapter(
                     self._registry,
                     self._settings.runtime,
-                    self._settings.groq,
+                    groq,
                     self._settings.streaming,
                 )
             return self._streaming
@@ -231,7 +234,7 @@ def _load_default_role_resolver() -> PolicyRoleResolver:
 def _production_engine(
     registry: ModelRegistry,
     runtime: SpeechRuntimeSettings,
-    groq: GroqTranscriptionSettings,
+    faster_whisper: FasterWhisperSettings,
     role_resolver: RoleResolverPort | None,
 ) -> CanonicalBatchEngine:
     return CanonicalBatchEngine(
@@ -246,9 +249,9 @@ def _production_engine(
                 codec=runtime.normalization_codec,
             )
         ),
-        ports=build_production_ports(registry, runtime, groq),
+        ports=build_production_ports(registry, runtime, faster_whisper),
         registry=registry,
         runtime=runtime,
-        groq=groq,
+        faster_whisper=faster_whisper,
         role_resolver=role_resolver,
     )

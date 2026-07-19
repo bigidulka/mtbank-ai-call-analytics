@@ -10,7 +10,7 @@
 ```text
 OpenWebUI Pipeline / REST / WebSocket
                 ↓
-Groq ASR → local pyannote Community-1 → role resolution
+local faster-whisper large-v3-turbo → local pyannote Community-1 → role resolution
                 ↓
 classifier · quality · compliance · summarizer
                 ↓
@@ -25,6 +25,8 @@ PostgreSQL · Trends · Prometheus/Grafana
 - PostgreSQL persistence, `POST /analyze`, `/trends`, opt-in `/ws/transcribe`;
 - Grafana, Prometheus и bounded WebSocket streaming;
 - versioned policies, typed agent outputs и deterministic aggregation.
+
+Типизированный собственный Supervisor выбран вместо LangGraph: линейный bounded workflow «speech → 4 агента → aggregation» не требует checkpoint-графа или human-in-the-loop state и остаётся проще для проверки.
 
 ## Тестовые звонки
 
@@ -68,4 +70,4 @@ docker compose -f docker-compose.yml config --quiet
 
 ## Ограничения
 
-Runtime намеренно использует Groq `whisper-large-v3-turbo` и local pyannote Community-1. Это **формально не закрывает** требование задания использовать local `faster-whisper` или `openai-whisper`; fallback ASR не реализован. Canonical corpus-wide WER/DER/role metrics, GPU WebSocket p95 и five-minute `<60 с` SLA не заявляются без реального воспроизводимого запуска.
+Canonical batch runtime использует local `faster-whisper` `large-v3-turbo` (CTranslate2) и local pyannote Community-1; ASR fallback отсутствует. Opt-in WebSocket provisional mode отдельно использует Groq и не влияет на batch ASR requirement. Five-minute CPU benchmark на этом хосте завершился HTTP 200 за **483.178 с** — SLA `<60 с` не выполнен. Canonical corpus-wide WER/DER/role metrics и GPU WebSocket p95 не заявляются: controlled evaluator остановился fail-closed после 3/5 files на HTTP 500.

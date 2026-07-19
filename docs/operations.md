@@ -2,9 +2,9 @@
 
 ## Runtime
 
-Canonical speech processing is Groq `whisper-large-v3-turbo` plus local offline `pyannote/speaker-diarization-community-1`. `GROQ_API_KEY` is supplied only to the speech service. Runtime does not download diarization artifacts; provision them separately before startup.
+Canonical batch speech processing is local `faster-whisper` `large-v3-turbo` plus local offline `pyannote/speaker-diarization-community-1`. Runtime verifies both local artifacts from `models/manifest.json` and never downloads models.
 
-Default Compose keeps streaming disabled. To enable a controlled WebSocket rollout, set one explicit browser origin and apply the overlay:
+Default Compose keeps streaming disabled and does not require `GROQ_API_KEY`. The opt-in WebSocket provisional mode additionally requires Groq credentials; set one explicit browser origin and apply the overlay:
 
 ```bash
 MTBANK_WEBSOCKET_ALLOWED_ORIGIN=https://approved.example \

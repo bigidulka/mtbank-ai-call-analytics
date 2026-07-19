@@ -46,16 +46,16 @@ def test_core_public_docs_remain_available() -> None:
     assert "CLIProxyAPI" not in readme
 
 
-def test_readme_discloses_asr_deviation_and_uncollected_runtime_evidence() -> None:
+def test_readme_discloses_local_asr_and_uncollected_runtime_evidence() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     for value in (
-        "Groq `whisper-large-v3-turbo`",
-        "local `faster-whisper`",
-        "формально не закрывает",
+        "local `faster-whisper` `large-v3-turbo`",
+        "local pyannote Community-1",
+        "Opt-in WebSocket provisional mode",
         "Canonical corpus-wide WER/DER/role metrics",
         "GPU WebSocket p95",
-        "five-minute `<60 с` SLA",
+        "SLA `<60 с` не выполнен",
     ):
         assert value in readme
     assert "dropbox-dash/faster-whisper-large-v3-turbo" not in readme

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import wave
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +25,7 @@ from services.speech.errors import SpeechProviderError
 from services.speech.manifest import ModelRegistry
 from services.speech.media import NormalizedAudio
 from services.speech.ports import AlignerPort, DiarizerPort, SpeakerAssignerPort, SpeechPorts, TranscriberPort
-from services.speech.settings import GroqTranscriptionSettings, SpeechRuntimeSettings
+from services.speech.settings import FasterWhisperSettings, GroqTranscriptionSettings, SpeechRuntimeSettings
 
 
 class GroqWhisperTranscriber(TranscriberPort):
@@ -85,8 +86,105 @@ class GroqWhisperTranscriber(TranscriberPort):
             raise SpeechProviderError("Groq transcription request failed") from error
 
 
+class FasterWhisperTranscriber(TranscriberPort):
+    """Runs the verified local CTranslate2 artifact without model downloads or fallback."""
+
+    def __init__(
+        self,
+        *,
+        model_path: Path,
+        settings: FasterWhisperSettings,
+        device: str,
+        model_factory: Callable[..., Any] | None = None,
+    ) -> None:
+        self._model_path = model_path
+        self._settings = settings
+        self._device = device
+        self._model_factory = model_factory
+        self._model: Any | None = None
+
+    def transcribe(self, audio: NormalizedAudio, *, language: str) -> TranscriptionResult:
+        if language != self._settings.language:
+            raise SpeechProviderError("configured local ASR language does not match canonical language")
+        try:
+            segments, _ = self._get_model().transcribe(
+                str(audio.path),
+                language=language,
+                task="transcribe",
+                beam_size=self._settings.beam_size,
+                vad_filter=self._settings.vad_filter,
+                word_timestamps=True,
+                condition_on_previous_text=True,
+            )
+            recognized = tuple(_faster_whisper_segment(segment) for segment in segments)
+            if not recognized:
+                return TranscriptionResult(language=language, segments=())
+            return TranscriptionResult(language=language, segments=recognized)
+        except SpeechProviderError:
+            raise
+        except Exception as error:
+            raise SpeechProviderError("local faster-whisper transcription failed") from error
+
+    def _get_model(self) -> Any:
+        if self._model is None:
+            if not self._model_path.is_dir():
+                raise SpeechProviderError("local faster-whisper artifact is unavailable")
+            try:
+                factory = self._model_factory
+                if factory is None:
+                    from faster_whisper import WhisperModel  # pyright: ignore[reportMissingImports]
+
+                    factory = WhisperModel
+                options: dict[str, Any] = {
+                    "device": self._device,
+                    "compute_type": self._settings.compute_type(device=self._device),
+                }
+                if self._device == "cpu":
+                    options["cpu_threads"] = self._settings.cpu_threads
+                self._model = factory(str(self._model_path), **options)
+            except Exception as error:
+                raise SpeechProviderError("local faster-whisper model load failed") from error
+        return self._model
+
+
+def _faster_whisper_segment(segment: Any) -> RecognizedSegment:
+    try:
+        segment_start = _finite_float(segment.start)
+        segment_end = _finite_float(segment.end)
+        words = getattr(segment, "words", None)
+        if not words:
+            raise ValueError("word timestamps are required")
+        recognized_words_list: list[RecognizedWord] = []
+        previous_end = 0.0
+        for word in words:
+            # Some CTranslate2 alignments round terminal words to zero duration.
+            # Preserve ordering and widen only to a deterministic one-millisecond interval.
+            start = max(_finite_float(word.start), previous_end)
+            end = max(_finite_float(word.end), start + 0.001)
+            recognized_words_list.append(
+                RecognizedWord(
+                    text=str(word.word).strip(),
+                    start=start,
+                    end=end,
+                    confidence=_optional_confidence(getattr(word, "probability", None)),
+                )
+            )
+            previous_end = end
+        recognized_words = tuple(recognized_words_list)
+        text = str(segment.text).strip()
+        if not text or not recognized_words:
+            raise ValueError("segment text and words are required")
+        # CTranslate2 may expose a leading word a few frames before its segment boundary.
+        # Preserve the provider timestamps by widening the segment, never clipping a word.
+        start = min(segment_start, recognized_words[0].start)
+        end = max(segment_end, recognized_words[-1].end)
+        return RecognizedSegment(start=start, end=end, text=text, words=recognized_words)
+    except (AttributeError, ValueError) as error:
+        raise SpeechProviderError("local faster-whisper segment is invalid") from error
+
+
 class PassthroughTimestampAligner(AlignerPort):
-    """Groq verbose JSON timestamps are already aligned; no local alignment model exists."""
+    """Native local ASR word timestamps are already aligned."""
 
     def align(
         self,
@@ -117,6 +215,22 @@ class PassthroughTimestampAligner(AlignerPort):
         )
 
 
+def _normalized_waveform(audio: NormalizedAudio) -> dict[str, Any]:
+    """Loads deterministic mono PCM WAV without TorchCodec or external decoder state."""
+
+    try:
+        import torch  # pyright: ignore[reportMissingImports]
+
+        with wave.open(str(audio.path), "rb") as source:
+            if source.getnchannels() != 1 or source.getsampwidth() != 2 or source.getframerate() != 16_000:
+                raise ValueError("normalized audio must be mono 16 kHz PCM s16le WAV")
+            samples = bytearray(source.readframes(source.getnframes()))
+        waveform = torch.frombuffer(samples, dtype=torch.int16).to(dtype=torch.float32).div_(32768.0).unsqueeze(0)
+        return {"waveform": waveform, "sample_rate": 16_000}
+    except (OSError, ValueError, wave.Error) as error:
+        raise SpeechProviderError("normalized audio waveform load failed") from error
+
+
 class PyannoteCommunityDiarizer(DiarizerPort):
     """Loads only a pre-fetched local Community-1 artifact; no runtime token/download."""
 
@@ -127,7 +241,7 @@ class PyannoteCommunityDiarizer(DiarizerPort):
 
     def diarize(self, audio: NormalizedAudio) -> tuple[DiarizationTurn, ...]:
         try:
-            result = self._get_pipeline()(str(audio.path))
+            result = self._get_pipeline()(_normalized_waveform(audio))
             annotation = getattr(result, "exclusive_speaker_diarization", None)
             if annotation is None:
                 annotation = getattr(result, "speaker_diarization", result)
@@ -196,12 +310,16 @@ class LocalOverlapSpeakerAssigner(SpeakerAssignerPort):
 def build_production_ports(
     registry: ModelRegistry,
     runtime: SpeechRuntimeSettings,
-    groq: GroqTranscriptionSettings,
+    faster_whisper: FasterWhisperSettings,
 ) -> SpeechPorts:
-    """Constructs the one Groq/pyannote adapter graph after local artifact verification."""
+    """Constructs the one local faster-whisper/pyannote canonical adapter graph."""
 
     return SpeechPorts(
-        transcriber=GroqWhisperTranscriber(groq),
+        transcriber=FasterWhisperTranscriber(
+            model_path=registry.artifact_path(registry.manifest.asr),
+            settings=faster_whisper,
+            device=runtime.device,
+        ),
         aligner=PassthroughTimestampAligner(),
         diarizer=PyannoteCommunityDiarizer(
             model_path=registry.artifact_path(registry.manifest.diarization),
@@ -313,7 +431,19 @@ def _best_speaker(word: WordTimestamp, turns: tuple[DiarizationTurn, ...]) -> tu
     if not candidates:
         return None, 0.0
     overlap, _, _, speaker_id = sorted(candidates, key=lambda item: (-round(item[0], 9), item[1], item[2], item[3]))[0]
-    return (speaker_id, overlap) if overlap > 0.0 else (None, 0.0)
+    if overlap > 0.0:
+        return speaker_id, overlap
+    # Diarization may leave a gap around recognized speech. Assign the deterministic nearest
+    # temporal turn; this uses no speaker-order assumption and keeps every recognized word.
+    nearest_gap, _, _, nearest_speaker = sorted(
+        (
+            (max(turn.start - word.end, word.start - turn.end, 0.0), turn.start, turn.end, turn.original_speaker_id)
+            for turn in turns
+        ),
+        key=lambda item: (round(item[0], 9), item[1], item[2], item[3]),
+    )[0]
+    del nearest_gap
+    return nearest_speaker, 0.0
 
 
 def _speaker_segment(group: list[_SpeakerWord]) -> SpeakerAttributedSegment:

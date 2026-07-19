@@ -7,3 +7,12 @@ services:
   speech:
     environment:
       MTBANK_SPEECH__STREAMING__ENABLED: "true"
+      MTBANK_SPEECH__GROQ__API_KEY: ${GROQ_API_KEY:?set GROQ_API_KEY for WebSocket streaming}
+      MTBANK_SPEECH__GROQ__ENDPOINT: https://api.groq.com/openai/v1/audio/transcriptions
+      MTBANK_SPEECH__GROQ__MODEL: whisper-large-v3-turbo
+      MTBANK_SPEECH__GROQ__LANGUAGE: ru
+      MTBANK_SPEECH__GROQ__TEMPERATURE: "0"
+      MTBANK_SPEECH__GROQ__RESPONSE_FORMAT: verbose_json
+    networks:
+      - application-internal
+      - speech-egress

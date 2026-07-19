@@ -2,7 +2,7 @@
 
 Privacy mode — `redacted-cloud`: PostgreSQL stores only sanitized analysis records and redacted lifecycle-event metadata. The schema has no raw audio, transcript, prompt or provider-response columns.
 
-Canonical batch ASR sends normalized raw audio to Groq only at `https://api.groq.com/openai/v1/audio/transcriptions`; bounded temporary WAV inputs used by WebSocket provisional updates are deleted after each provider call. Local pyannote Community-1 runs only from a provisioned offline artifact.
+Canonical batch ASR and diarization run from provisioned local faster-whisper and pyannote artifacts; normalized audio does not leave the canonical speech container. The opt-in WebSocket provisional mode sends bounded temporary WAV input to Groq and deletes it after each provider call; it requires separate approval before live use.
 
 Only project-generated synthetic audio is appropriate for the included validation corpus. Real customer and production banking data require separate organizational legal/privacy approval before remote processing or retention.
 

@@ -17,7 +17,6 @@ services:
       MTBANK_API_KEY: ${MTBANK_API_KEY:?set MTBANK_API_KEY in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
-      GROQ_API_KEY: ${GROQ_API_KEY:?set GROQ_API_KEY in .env}
     network_mode: none
     read_only: true
     tmpfs:
@@ -389,17 +388,15 @@ services:
     environment:
       MTBANK_SPEECH__RUNTIME__DEVICE: cpu
       MTBANK_SPEECH__RUNTIME__LANGUAGE: ru
-      MTBANK_SPEECH__RUNTIME__PIPELINE_REVISION: speech/canonical-v1
+      MTBANK_SPEECH__RUNTIME__PIPELINE_REVISION: speech/local-faster-whisper-v1
       MTBANK_SPEECH__RUNTIME__ROLE_REVIEW_CONFIDENCE_THRESHOLD: "0.75"
-      MTBANK_SPEECH__GROQ__API_KEY: ${GROQ_API_KEY:?set GROQ_API_KEY in .env}
-      MTBANK_SPEECH__GROQ__ENDPOINT: https://api.groq.com/openai/v1/audio/transcriptions
-      MTBANK_SPEECH__GROQ__MODEL: whisper-large-v3-turbo
-      MTBANK_SPEECH__GROQ__LANGUAGE: ru
-      MTBANK_SPEECH__GROQ__TEMPERATURE: "0"
-      MTBANK_SPEECH__GROQ__RESPONSE_FORMAT: verbose_json
-      MTBANK_SPEECH__GROQ__REQUEST_TIMEOUT_SECONDS: "180"
-      MTBANK_SPEECH__GROQ__CONNECT_TIMEOUT_SECONDS: "10"
-      MTBANK_SPEECH__GROQ__MAX_RESPONSE_BYTES: "4194304"
+      MTBANK_SPEECH__FASTER_WHISPER__MODEL_ID: dropbox-dash/faster-whisper-large-v3-turbo
+      MTBANK_SPEECH__FASTER_WHISPER__LANGUAGE: ru
+      MTBANK_SPEECH__FASTER_WHISPER__BEAM_SIZE: "5"
+      MTBANK_SPEECH__FASTER_WHISPER__CPU_COMPUTE_TYPE: int8
+      MTBANK_SPEECH__FASTER_WHISPER__CUDA_COMPUTE_TYPE: float16
+      MTBANK_SPEECH__FASTER_WHISPER__CPU_THREADS: "8"
+      MTBANK_SPEECH__FASTER_WHISPER__VAD_FILTER: "false"
       MTBANK_SPEECH__RUNTIME__NORMALIZATION_SAMPLE_RATE_HZ: "16000"
       MTBANK_SPEECH__RUNTIME__NORMALIZATION_CHANNELS: "1"
       MTBANK_SPEECH__RUNTIME__NORMALIZATION_CODEC: pcm_s16le
@@ -436,7 +433,6 @@ services:
       - "8010"
     networks:
       - application-internal
-      - speech-egress
     volumes:
       - ./models:/models:ro
     read_only: true

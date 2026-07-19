@@ -126,7 +126,7 @@ def test_canonical_engine_calls_full_transcription_once_and_reuses_it_for_alignm
         ports=SpeechPorts(transcription, aligner, diarizer, assigner),
         registry=registry,
         runtime=settings.runtime,
-        groq=settings.groq,
+        faster_whisper=settings.faster_whisper,
         clock=lambda: datetime(2026, 7, 15, tzinfo=UTC),
     )
 
@@ -169,7 +169,7 @@ def test_engine_returns_typed_pre_resolution_outcome_without_snapshot_for_unmapp
         ),
         registry=registry,
         runtime=settings.runtime,
-        groq=settings.groq,
+        faster_whisper=settings.faster_whisper,
         clock=lambda: datetime(2026, 7, 15, tzinfo=UTC),
     )
 
@@ -189,7 +189,7 @@ def test_engine_rejects_no_speech_before_alignment(tmp_path: Path) -> None:
         ports=SpeechPorts(transcriber, aligner, FakeDiarizer(), FakeSpeakerAssigner()),
         registry=registry,
         runtime=settings.runtime,
-        groq=settings.groq,
+        faster_whisper=settings.faster_whisper,
     )
 
     with pytest.raises(NoSpeechError):

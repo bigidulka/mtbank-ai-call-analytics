@@ -9,18 +9,31 @@ from typing import Literal, Self
 from pydantic import HttpUrl, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from mtbank_ai.domain.base import (
-    Confidence,
-    NonEmptyId,
-    NonNegativeInt,
-    PositiveFloat,
-    PositiveInt,
-    StrictFrozenModel,
-)
+from mtbank_ai.domain.base import Confidence, NonEmptyId, NonNegativeInt, PositiveFloat, PositiveInt, StrictFrozenModel
+
+
+class FasterWhisperSettings(StrictFrozenModel):
+    """Local CTranslate2 faster-whisper settings for the canonical batch path."""
+
+    provider: Literal["faster-whisper"] = "faster-whisper"
+    model_id: Literal["dropbox-dash/faster-whisper-large-v3-turbo"] = "dropbox-dash/faster-whisper-large-v3-turbo"
+    language: Literal["ru"] = "ru"
+    beam_size: PositiveInt = 5
+    cpu_compute_type: Literal["int8"] = "int8"
+    cuda_compute_type: Literal["float16"] = "float16"
+    cpu_threads: PositiveInt = 8
+    vad_filter: bool = False
+
+    def compute_type(self, *, device: str) -> str:
+        if device == "cpu":
+            return self.cpu_compute_type
+        if device == "cuda":
+            return self.cuda_compute_type
+        raise ValueError("unsupported faster-whisper device")
 
 
 class GroqTranscriptionSettings(StrictFrozenModel):
-    """Groq's OpenAI-compatible batch transcription endpoint only."""
+    """Opt-in Groq provider used only by provisional rolling WebSocket updates."""
 
     provider: Literal["groq"] = "groq"
     api_key: SecretStr
@@ -64,7 +77,7 @@ class GroqTranscriptionSettings(StrictFrozenModel):
 class SpeechRuntimeSettings(StrictFrozenModel):
     device: Literal["cpu", "cuda"] = "cpu"
     language: Literal["ru"] = "ru"
-    pipeline_revision: NonEmptyId = "speech/canonical-v1"
+    pipeline_revision: NonEmptyId = "speech/local-faster-whisper-v1"
     role_review_confidence_threshold: Confidence = 0.75
     normalization_sample_rate_hz: PositiveInt = 16_000
     normalization_channels: Literal[1] = 1
@@ -79,7 +92,7 @@ class SpeechRuntimeSettings(StrictFrozenModel):
 
 
 class SpeechStreamingSettings(StrictFrozenModel):
-    """Bounded Groq rolling transcription settings for provisional WebSocket updates."""
+    """Bounded opt-in Groq rolling transcription settings for provisional WebSocket updates."""
 
     enabled: bool = False
     max_frame_bytes: PositiveInt = 64 * 1024
@@ -110,11 +123,11 @@ class SpeechStreamingSettings(StrictFrozenModel):
         if self.max_decoder_output_bytes < required_pcm_bytes:
             raise ValueError("streaming max_decoder_output_bytes не покрывает максимальную PCM duration")
         if self.rolling_step_seconds > self.rolling_window_seconds:
-            raise ValueError("streaming rolling_step_seconds не может превышать rolling_window_seconds")
+            raise ValueError("streaming rolling_step_seconds не может превышать streaming rolling_window_seconds")
         if self.rolling_call_timeout_seconds > self.processing_timeout_seconds:
             raise ValueError("rolling call timeout не может превышать streaming processing timeout")
         if self.max_rolling_audio_seconds_per_session > self.max_duration_seconds:
-            raise ValueError("rolling audio budget не может превышать streaming duration")
+            raise ValueError("streaming rolling audio budget не может превышать max duration")
         return self
 
 
@@ -124,7 +137,7 @@ class SpeechModelSettings(StrictFrozenModel):
 
 
 class SpeechSettings(BaseSettings):
-    """Runtime accepts a Groq secret only from its environment settings source."""
+    """Canonical batch needs only local artifacts; Groq is optional streaming configuration."""
 
     model_config = SettingsConfigDict(
         case_sensitive=False,
@@ -139,7 +152,8 @@ class SpeechSettings(BaseSettings):
     )
 
     runtime: SpeechRuntimeSettings = SpeechRuntimeSettings()
-    groq: GroqTranscriptionSettings
+    faster_whisper: FasterWhisperSettings = FasterWhisperSettings()
+    groq: GroqTranscriptionSettings | None = None
     streaming: SpeechStreamingSettings = SpeechStreamingSettings()
     models: SpeechModelSettings = SpeechModelSettings()
 
@@ -151,8 +165,13 @@ class SpeechSettings(BaseSettings):
             raise ValueError("temp_root должен быть абсолютным путём")
         if not Path(self.models.manifest_path).is_absolute() or not Path(self.models.artifact_root).is_absolute():
             raise ValueError("пути model manifest и artifacts должны быть абсолютными")
-        if self.runtime.language != self.groq.language:
-            raise ValueError("canonical speech language must match Groq language")
+        if self.runtime.language != self.faster_whisper.language:
+            raise ValueError("canonical speech language must match local faster-whisper language")
+        if self.streaming.enabled:
+            if self.groq is None:
+                raise ValueError("Groq configuration is required only when streaming is enabled")
+            if self.runtime.language != self.groq.language:
+                raise ValueError("streaming Groq language must match canonical language")
         return self
 
     @property

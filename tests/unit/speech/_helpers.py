@@ -20,10 +20,21 @@ def make_registry(
     runtime: SpeechRuntimeSettings | None = None,
 ) -> tuple[ModelRegistry, SpeechSettings]:
     artifact_root = tmp_path / "artifacts"
+    asr = artifact_root / "asr"
     diarization = artifact_root / "diarization"
+    asr.mkdir(parents=True)
     diarization.mkdir(parents=True)
+    (asr / "model.bin").write_bytes(b"faster-whisper")
     (diarization / "artifact.bin").write_bytes(b"diarization")
     manifest = SpeechModelManifest(
+        asr=ModelArtifact(
+            package="faster-whisper",
+            package_version="1.2.1",
+            model_id="dropbox-dash/faster-whisper-large-v3-turbo",
+            model_revision="test-asr",
+            relative_path="asr",
+            artifact_sha256=artifact_tree_sha256(asr),
+        ),
         diarization=ModelArtifact(
             package="pyannote.audio",
             package_version="4.0.7",

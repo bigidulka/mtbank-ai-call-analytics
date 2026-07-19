@@ -43,7 +43,7 @@ from services.speech.errors import (
 )
 from services.speech.runtime import LazySpeechRuntime, SpeechRuntimePort, StreamingRuntimePort, UnavailableSpeechRuntime
 from services.speech.settings import (
-    GroqTranscriptionSettings,
+    FasterWhisperSettings,
     SpeechModelSettings,
     SpeechRuntimeSettings,
     SpeechSettings,
@@ -297,7 +297,8 @@ def _resolve_settings(settings: SpeechSettings | None) -> tuple[SpeechSettings, 
         return (
             SpeechSettings.model_construct(
                 runtime=SpeechRuntimeSettings(),
-                groq=GroqTranscriptionSettings.model_construct(),
+                faster_whisper=FasterWhisperSettings(),
+                groq=None,
                 models=SpeechModelSettings(),
             ),
             True,

@@ -9,12 +9,11 @@ external CI/runtime artifact, not in `release-evidence/` or the repository.
 ## Required immutable evidence
 
 - [ ] Licensed corpus approval for the authored synthetic corpus: 5 calls, 714.802
-  seconds, reference text/roles, 8 kHz and WAV/MP3/OGG. The committed provenance and
-  external Groq WER baseline do not replace final licence/retention approval.
-- [ ] Controlled Groq `whisper-large-v3-turbo` + local Community-1 WER/DER/role report for the same corpus, produced by `evaluate_canonical_speech.py`.
-- [ ] Reviewed gated local Community-1 artifact and manifest hash; no local ASR/alignment artifacts exist.
-- [ ] Groq credentials and approved remote raw-audio disclosure for the exact controlled corpus/runtime scope.
-- [ ] Formal deviation from assignment wording is approved: canonical ASR is Groq, not local `faster-whisper`; no `faster-whisper`, `openai-whisper` or ASR fallback is claimed.
+  seconds, reference text/roles, 8 kHz and WAV/MP3/OGG.
+- [ ] Complete local `faster-whisper` + Community-1 WER/DER/role report for all five files, produced by `evaluate_canonical_speech.py`.
+- [x] Reviewed local faster-whisper and gated Community-1 artifact manifest hashes.
+- [ ] Groq credentials and approved remote raw-audio disclosure only for opt-in WebSocket provisional mode.
+- [x] Canonical batch ASR uses local `faster-whisper` medium+ equivalent (`large-v3-turbo`); ASR fallback is absent.
 - [x] Development OpenAI-compatible CLIProxyAPI model identity and local four-agent
   live smoke with retrieval and terminal submissions.
 - [ ] Final gateway HTTPS nonce-bound release attestation and canonical trace artifact

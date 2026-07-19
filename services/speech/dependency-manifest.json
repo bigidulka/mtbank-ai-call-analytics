@@ -1,11 +1,11 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "speech_runtime": {
-    "groq": {
-      "provider": "groq",
-      "endpoint": "https://api.groq.com/openai/v1/audio/transcriptions",
-      "model": "whisper-large-v3-turbo",
-      "protocol": "openai-compatible"
+    "faster_whisper": {
+      "package": "faster-whisper",
+      "version": "1.2.1",
+      "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+      "runtime": "CTranslate2"
     },
     "pyannote_audio": {
       "package": "pyannote.audio",
@@ -15,7 +15,12 @@
     "torch": {
       "package": "torch",
       "version": "2.8.0"
+    },
+    "streaming": {
+      "provider": "groq",
+      "protocol": "openai-compatible",
+      "mode": "opt-in provisional only"
     }
   },
-  "release_compatibility_gate": "Run a controlled Groq plus local pyannote Community-1 E2E only after the gated artifact, Groq credential approval, and privacy review are available."
+  "release_compatibility_gate": "Canonical batch E2E requires verified local faster-whisper and Community-1 artifacts; optional remote streaming additionally requires approved Groq credentials and privacy review."
 }

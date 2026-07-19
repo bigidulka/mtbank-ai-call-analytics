@@ -21,7 +21,7 @@ from pydantic import StringConstraints, ValidationError, field_validator, model_
 from mtbank_ai.domain.base import NonEmptyId, Sha256, StrictFrozenModel
 from services.speech.manifest import ModelArtifact, SpeechModelManifest, artifact_tree_sha256
 
-_COMPONENTS = ("diarization",)
+_COMPONENTS = ("asr", "diarization")
 _PROVENANCE_FILENAME = ".mtbank-speech-provenance.json"
 _ARTIFACT_CONTENT_DIGEST_SCHEMA = "v2"
 _ARTIFACT_CONTENT_DIGEST_DOMAIN = b"mtbank-ai:speech-artifact-content:v2\x00"
@@ -72,7 +72,7 @@ class ModelSources(StrictFrozenModel):
     @model_validator(mode="after")
     def require_exact_components(self) -> ModelSources:
         if set(self.sources) != set(_COMPONENTS):
-            raise ValueError("model sources должны содержать ровно diarization")
+            raise ValueError("model sources должны содержать ровно asr и diarization")
         paths = tuple(self.sources[name].relative_path for name in _COMPONENTS)
         if len(set(paths)) != len(paths):
             raise ValueError("model source paths должны быть уникальны")
@@ -195,7 +195,7 @@ def provision(
         artifacts = {**existing, **provisioned}
         if len(artifacts) != len(_COMPONENTS):
             return None
-        manifest = SpeechModelManifest(diarization=artifacts["diarization"])
+        manifest = SpeechModelManifest(asr=artifacts["asr"], diarization=artifacts["diarization"])
         persisted = _write_or_verify_manifest(output, manifest, publication=manifest_publication)
         committed = True
         return persisted

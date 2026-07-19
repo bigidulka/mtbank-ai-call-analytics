@@ -1,38 +1,16 @@
 # Evals и тестовые данные
 
-## Speech corpus
+## Corpus
 
-`test_data/manifest.yaml` имеет статус `release_ready` и содержит:
-
-- 5 authored synthetic русских звонков;
-- 714.802 секунды аудио;
-- два разных голоса и exact роли `Оператор` / `Клиент`;
-- WAV, MP3 и OGG;
-- 8 kHz telephone-quality fixture;
-- reference transcript segments с timestamps;
-- SHA-256 аудио и reference artifacts;
-- отдельные transport-only silence fixtures, исключённые из scoring.
-
-Сценарии написаны для проекта и сгенерированы Edge TTS голосами
-`ru-RU-SvetlanaNeural` и `ru-RU-DmitryNeural`, как прямо разрешено заданием.
-Реальных клиентов и персональных данных нет.
-
-Воспроизведение corpus:
+`test_data/manifest.yaml` содержит пять authored synthetic русскоязычных звонков: 714.802 секунды, WAV/MP3/OGG, 8 kHz telephone fixture, два голоса, reference timestamps и роли `Оператор`/`Клиент`. Реальных клиентов и PII нет.
 
 ```bash
-uv run --with edge-tts --with pydub python scripts/generate_synthetic_dataset.py
 uv run python scripts/validate_test_manifest.py --require-release-corpus
 ```
 
-## Canonical speech evaluation
+## Canonical batch evaluation
 
-Единственный canonical runtime path — `Groq whisper-large-v3-turbo` для ASR и local
-offline `pyannote/speaker-diarization-community-1` для diarization. Это **формальное
-отклонение** от формулировки задания про local `faster-whisper`: `faster-whisper`,
-`openai-whisper` и ASR fallback не реализованы и не заявляются как runtime capability.
-
-Для controlled environment с уже доступным canonical `/v1/transcribe` используйте
-последовательный runner:
+Canonical path — local `faster-whisper` `dropbox-dash/faster-whisper-large-v3-turbo` (CTranslate2, `int8` CPU / `float16` CUDA) и local offline `pyannote/speaker-diarization-community-1`. Runtime загружает только artifact, проверенный по manifest SHA-256; загрузка модели из сети запрещена.
 
 ```bash
 uv run python scripts/evaluate_canonical_speech.py \
@@ -40,43 +18,23 @@ uv run python scripts/evaluate_canonical_speech.py \
   --output release-evidence/canonical-speech-evaluation.json
 ```
 
-Runner строго валидирует release manifest до первого запроса, передаёт каждый файл
-одним multipart `POST /v1/transcribe` с declared MIME (`audio/wav`, `audio/mpeg` или
-`audio/ogg`) и не параллелит audio requests. Artifact содержит только fixture/audio/
-reference/hypothesis SHA-256, component revisions, latency и WER/DER/role/
-speaker-attributed metric results — без audio, transcript, provider body, request ID
-или credentials. `502` останавливает evaluation как provider failure; `409` явно
-фиксируется как role-resolution failure, а не превращается в metric.
+Runner последовательно отправляет все пять files в canonical `/v1/transcribe`, затем считает micro WER, DER, time-weighted role accuracy и speaker-attributed WER. Output содержит только hashes, component revisions, latency и metric counts — без audio, transcript, provider body, request ID или credentials. Любой `409`, `5xx` или invalid response останавливает run fail-closed; partial result не является corpus-wide metric claim.
 
-WER сравнивает time-sorted sequence нормализованных слов и не зависит от UUID
-canonical segments или иной сегментации. DER, time-weighted role accuracy и
-speaker-attributed WER сохраняются отдельными metrics.
-
-На текущем revision canonical corpus-wide metrics **не выполнены и не опубликованы**.
-Отсутствие результата не означает pass release gate.
-
-## Direct Groq evaluator
+## Five-minute SLA
 
 ```bash
-uv run python scripts/evaluate_groq_stt.py
+uv run python scripts/run_local_speech_sla_benchmark.py \
+  --base-url http://canonical-speech-host:8010 \
+  --audio test_data/synthetic/credit-consultation-16k.wav \
+  --output release-evidence/five-minute-sla.json
 ```
 
-`evaluate_groq_stt.py` обращается к Groq напрямую и является только
-**noncanonical external ASR sanity evaluator**. Он не запускает local Community-1,
-не вычисляет DER/role/speaker-attributed metrics и не доказывает canonical runtime
-quality или GPU SLA. Его output хранит hashes и error counts, но не raw provider
-response.
+Benchmark детерминированно создаёт ровно 300-секундный WAV, передаёт его canonical service и сохраняет только hashes, duration, HTTP status и wall latency. SLA `<60 с` объявляется только при `within_sla=true` в actual output. Контролируемый CPU result [`local-faster-whisper-five-minute-cpu.json`](../test_data/evaluations/local-faster-whisper-five-minute-cpu.json): HTTP 200, 300 секунд audio, 483.178 секунд wall latency, `within_sla=false`.
+
+## Streaming
+
+Groq используется только в opt-in WebSocket provisional mode. Он не является batch fallback и не влияет на local-ASR canonical evaluation.
 
 ## Artifact policy
 
-`models/manifest.json` и `models/.gitkeep` — reviewable repository metadata.
-Provisioned `models/artifacts/`, `tmp/`, `secrets/` и `release-evidence/` не коммитятся.
-Privacy-safe artifacts от controlled runs должны
-передаваться как external CI/runtime evidence; они не заменяются hand-authored JSON.
-
-## Agent evals
-
-Offline tests проверяют schema, evidence IDs, required retrieval, terminal submit,
-prompt injection boundaries, budgets, retry и deterministic aggregation. Любые live
-agent claims требуют nonce-bound external attestation; локальные unit tests не
-являются такой attestation.
+`models/manifest.json` и `models/.gitkeep` версионируются; weights в `models/artifacts/`, временные benchmark files и `release-evidence/` игнорируются. Privacy-safe external evidence публикуется только после полного controlled run.

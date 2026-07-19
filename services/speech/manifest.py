@@ -1,4 +1,4 @@
-"""Verified local pyannote manifest; runtime never downloads gated artifacts."""
+"""Verified local faster-whisper and pyannote artifacts; runtime never downloads models."""
 
 from __future__ import annotations
 
@@ -42,12 +42,13 @@ class ModelArtifact(StrictFrozenModel):
 
 
 class SpeechModelManifest(StrictFrozenModel):
-    schema_version: Literal["2"] = "2"
+    schema_version: Literal["3"] = "3"
+    asr: ModelArtifact
     diarization: ModelArtifact
 
 
 class ModelRegistry:
-    """Validates the sole local Community-1 artifact before the adapter may load it."""
+    """Validates both local canonical-ASR and diarization artifacts before load."""
 
     def __init__(self, *, artifact_root: Path, manifest: SpeechModelManifest) -> None:
         self._artifact_root = artifact_root.resolve()
@@ -59,7 +60,7 @@ class ModelRegistry:
             raw_manifest = json.loads(settings.manifest_path.read_text(encoding="utf-8"))
             manifest = SpeechModelManifest.model_validate(raw_manifest)
         except (OSError, ValueError) as error:
-            raise SpeechConfigurationError("local diarization manifest is unavailable") from error
+            raise SpeechConfigurationError("local ASR/diarization manifest is unavailable") from error
         return cls(artifact_root=settings.artifact_root, manifest=manifest)
 
     @property
@@ -72,14 +73,19 @@ class ModelRegistry:
             raise SpeechConfigurationError("model artifact path escapes artifact root")
         return target
 
+    def asr_revision(self) -> ComponentRevision:
+        return self._manifest.asr.as_component_revision()
+
     def diarization_revision(self) -> ComponentRevision:
         return self._manifest.diarization.as_component_revision()
 
     def verify_ready(self) -> bool:
         try:
-            artifact = self._manifest.diarization
-            path = self.artifact_path(artifact)
-            return path.is_dir() and _tree_sha256(path) == artifact.artifact_sha256
+            return all(
+                self.artifact_path(artifact).is_dir()
+                and _tree_sha256(self.artifact_path(artifact)) == artifact.artifact_sha256
+                for artifact in (self._manifest.asr, self._manifest.diarization)
+            )
         except (OSError, SpeechConfigurationError):
             return False
 

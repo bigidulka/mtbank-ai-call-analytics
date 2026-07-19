@@ -1,4 +1,12 @@
 {
+  "asr": {
+    "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b",
+    "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+    "model_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+    "package": "faster-whisper",
+    "package_version": "1.2.1",
+    "relative_path": "asr"
+  },
   "diarization": {
     "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18",
     "model_id": "pyannote/speaker-diarization-community-1",
@@ -7,5 +15,5 @@
     "package_version": "4.0.7",
     "relative_path": "diarization"
   },
-  "schema_version": "2"
+  "schema_version": "3"
 }

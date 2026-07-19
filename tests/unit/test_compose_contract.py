@@ -69,7 +69,7 @@ def test_compose_pins_artifacts_and_keeps_backend_services_private() -> None:
     assert _service_networks(bootstrap_service) == ("frontend",)
     assert _service_networks(postgres_service) == ("application-internal",)
     assert _service_networks(migrate_service) == ("application-internal",)
-    assert _service_networks(speech_service) == ("application-internal", "speech-egress")
+    assert _service_networks(speech_service) == ("application-internal",)
     assert _service_networks(api_service) == ("application-internal", "model-egress")
     assert compose.count("      - gateway-ingress") == 1
     assert compose.count("      - model-egress") == 1
@@ -110,9 +110,9 @@ def test_compose_uses_fail_closed_secret_preflight() -> None:
         "MTBANK_ATTACHMENT_SIGNING_KEY",
         "MTBANK_API_KEY",
         "POSTGRES_PASSWORD",
-        "GROQ_API_KEY",
     ):
         assert f"{name}: ${{{name}:?set {name} in .env}}" in preflight
+    assert "GROQ_API_KEY" not in preflight
 
 
 def test_compose_authenticates_every_pipelines_route() -> None:
@@ -139,7 +139,7 @@ def test_compose_activates_pipeline_to_api_without_model_egress() -> None:
     assert _service_networks(pipelines_service) == ("pipeline-internal", "application-internal")
     assert "model-egress" not in pipelines_service
     assert _service_networks(api_service) == ("application-internal", "model-egress")
-    assert _service_networks(speech_service) == ("application-internal", "speech-egress")
+    assert _service_networks(speech_service) == ("application-internal",)
     assert "model-egress" not in speech_service
     assert "speech-egress" not in api_service
     assert "model-egress" not in postgres_service

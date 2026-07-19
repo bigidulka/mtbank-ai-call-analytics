@@ -23,7 +23,7 @@ from services.speech.errors import NoSpeechError, SpeechProviderError
 from services.speech.manifest import ModelRegistry
 from services.speech.media import NormalizedAudio
 from services.speech.ports import SpeechPorts
-from services.speech.settings import GroqTranscriptionSettings, SpeechRuntimeSettings
+from services.speech.settings import FasterWhisperSettings, SpeechRuntimeSettings
 
 _UNASSIGNED_SPEAKER_ID = "UNASSIGNED"
 
@@ -33,7 +33,7 @@ class MediaNormalizerPort(Protocol):
 
 
 class CanonicalBatchEngine:
-    """A request has exactly one full Groq transcription invocation."""
+    """A request has exactly one local faster-whisper transcription invocation."""
 
     def __init__(
         self,
@@ -42,7 +42,7 @@ class CanonicalBatchEngine:
         ports: SpeechPorts,
         registry: ModelRegistry,
         runtime: SpeechRuntimeSettings,
-        groq: GroqTranscriptionSettings,
+        faster_whisper: FasterWhisperSettings,
         role_resolver: RoleResolverPort | None = None,
         clock: Callable[[], datetime] | None = None,
         telemetry: Telemetry | None = None,
@@ -51,7 +51,7 @@ class CanonicalBatchEngine:
         self._ports = ports
         self._registry = registry
         self._runtime = runtime
-        self._groq = groq
+        self._faster_whisper = faster_whisper
         self._role_resolver = role_resolver
         self._clock = clock or (lambda: datetime.now(UTC))
         self._telemetry = telemetry or Telemetry()
@@ -63,13 +63,13 @@ class CanonicalBatchEngine:
             with self._telemetry.span("speech.asr"):
                 transcription = self._ports.transcriber.transcribe(audio, language=self._runtime.language)
             if not transcription.segments:
-                raise NoSpeechError("Groq returned no speech segments")
+                raise NoSpeechError("local faster-whisper returned no speech segments")
 
-            # Groq verbose JSON timestamps are already aligned; this adapter is a pure passthrough.
+            # Native faster-whisper word timestamps are already aligned.
             with self._telemetry.span("speech.alignment"):
                 aligned = self._ports.aligner.align(audio, transcription, language=self._runtime.language)
             if not aligned:
-                raise NoSpeechError("Groq returned no aligned speech segments")
+                raise NoSpeechError("local faster-whisper returned no aligned speech segments")
 
             with self._telemetry.span("speech.diarization"):
                 diarization = self._ports.diarizer.diarize(audio)
@@ -147,17 +147,13 @@ class CanonicalBatchEngine:
             segments=resolved_segments,
             role_resolution=resolution,
             asr_metadata=ASRMetadata(
-                asr=ComponentRevision(
-                    package="groq",
-                    package_version="openai-compatible",
-                    model_id=self._groq.model,
-                    model_revision="batch-transcriptions-v1",
-                ),
+                asr=self._registry.asr_revision(),
                 alignment=ComponentRevision(
-                    package="groq",
-                    package_version="verbose_json",
-                    model_id=self._groq.model,
-                    model_revision="word-and-segment-timestamps",
+                    package="faster-whisper",
+                    package_version="1.2.1",
+                    model_id=self._faster_whisper.model_id,
+                    model_revision="native-word-timestamps-v1",
+                    artifact_sha256=self._registry.manifest.asr.artifact_sha256,
                 ),
                 diarization=self._registry.diarization_revision(),
                 language=self._runtime.language,

@@ -197,9 +197,18 @@ def test_model_registry_rechecks_artifacts_after_a_successful_readiness_probe(tm
     assert not registry.verify_ready()
 
 
-def test_typed_speech_settings_fail_closed_without_groq_secret() -> None:
-    with pytest.raises(ValidationError, match="groq"):
-        SpeechSettings.model_validate({"runtime": SpeechRuntimeSettings().model_dump()})
+def test_typed_speech_settings_supports_local_batch_without_groq_secret() -> None:
+    settings = SpeechSettings.model_validate({"runtime": SpeechRuntimeSettings().model_dump()})
+
+    assert settings.groq is None
+    assert settings.faster_whisper.model_id == "dropbox-dash/faster-whisper-large-v3-turbo"
+
+
+def test_typed_speech_settings_requires_groq_only_for_enabled_streaming() -> None:
+    with pytest.raises(ValidationError, match="Groq"):
+        SpeechSettings.model_validate(
+            {"runtime": SpeechRuntimeSettings().model_dump(), "streaming": {"enabled": True}}
+        )
 
 
 def test_speech_images_profiles_and_lock_are_staticly_pinned() -> None:
@@ -211,6 +220,7 @@ def test_speech_images_profiles_and_lock_are_staticly_pinned() -> None:
     lock = tomllib.loads((ROOT / "services" / "speech" / "uv.lock").read_text(encoding="utf-8"))
 
     expected_dependencies = {
+        "faster-whisper==1.2.1",
         "fastapi==0.139.0",
         "httpx==0.28.1",
         "pyannote.audio==4.0.7",
@@ -221,15 +231,15 @@ def test_speech_images_profiles_and_lock_are_staticly_pinned() -> None:
     assert project["tool"]["uv"] == {"package": False}
     locked = {item["name"]: item["version"] for item in lock["package"]}
     assert locked["pyannote-audio"] == "4.0.7"
-    assert "faster-whisper" not in locked
+    assert locked["faster-whisper"] == "1.2.1"
     assert "whisperx" not in locked
     dependency_manifest_path = ROOT / "services" / "speech" / "dependency-manifest.json"
     dependency_manifest = json.loads(dependency_manifest_path.read_text(encoding="utf-8"))
-    assert dependency_manifest["speech_runtime"]["groq"] == {
-        "provider": "groq",
-        "endpoint": "https://api.groq.com/openai/v1/audio/transcriptions",
-        "model": "whisper-large-v3-turbo",
-        "protocol": "openai-compatible",
+    assert dependency_manifest["speech_runtime"]["faster_whisper"] == {
+        "package": "faster-whisper",
+        "version": "1.2.1",
+        "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+        "runtime": "CTranslate2",
     }
     assert dependency_manifest["speech_runtime"]["pyannote_audio"]["model_id"] == (
         "pyannote/speaker-diarization-community-1"

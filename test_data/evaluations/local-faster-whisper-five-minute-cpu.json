@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "kind": "canonical-five-minute-sla",
+  "canonical_speech_path": true,
+  "source_sha256": "a44a6a2e22907a1070cc8c0552c6f2871e82141c6c993601fa79b129361f15cd",
+  "workload_sha256": "de4970b4366408730500377bbc3f8a71e467e591c0f0a0b2509cf223277da344",
+  "audio_seconds": 300.0,
+  "elapsed_seconds": 483.178,
+  "threshold_seconds": 60.0,
+  "status_code": 200,
+  "within_sla": false
+}

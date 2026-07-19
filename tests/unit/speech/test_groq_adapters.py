@@ -169,7 +169,7 @@ def test_overlap_assigner_groups_consecutive_words_and_is_deterministic_at_edges
     assert result[0].speaker_confidence == pytest.approx((0.5 + 0.5 + 0.1) / (0.5 + 0.5 + 0.2))
 
 
-def test_overlap_assigner_leaves_zero_overlap_unassigned_for_role_fail_closed() -> None:
+def test_overlap_assigner_uses_nearest_turn_for_zero_overlap_without_speaker_order_heuristic() -> None:
     result = LocalOverlapSpeakerAssigner().assign(
         (
             AlignedSegment(
@@ -182,5 +182,5 @@ def test_overlap_assigner_leaves_zero_overlap_unassigned_for_role_fail_closed() 
         (DiarizationTurn(original_speaker_id="SPEAKER_A", start=0.0, end=1.0),),
     )
 
-    assert result[0].original_speaker_id is None
-    assert result[0].speaker_confidence is None
+    assert result[0].original_speaker_id == "SPEAKER_A"
+    assert result[0].speaker_confidence == 0.0
