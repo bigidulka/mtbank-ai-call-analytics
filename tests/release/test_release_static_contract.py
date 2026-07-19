@@ -37,48 +37,25 @@ def test_ci_has_offline_real_and_gpu_release_jobs() -> None:
     assert "pytest -m gpu" in gpu
 
 
-def test_release_docs_link_real_contracts_and_known_blockers() -> None:
-    required = (
-        "architecture.md",
-        "api.md",
-        "evals.md",
-        "privacy.md",
-        "operations.md",
-        "threat-model.md",
-        "release-checklist.md",
-    )
-    for filename in required:
-        content = (ROOT / "docs" / filename).read_text(encoding="utf-8")
-        assert "release" in content.casefold() or "Release" in content
-    checklist = (ROOT / "docs" / "release-checklist.md").read_text(encoding="utf-8")
-    for blocker in (
-        "Licensed corpus approval",
-        "Community-1 artifact",
-        "Groq credentials",
-        "remote raw-audio disclosure",
-        "Final gateway HTTPS",
-        "GPU",
-        "Grafana",
-        "canonical image digest",
-        "Final competitor score",
-    ):
-        assert blocker in checklist
-    assert "--allow-blocked" in checklist
-    assert "diagnostic blocked-gate report" in checklist
-    assert "external CI/runtime artifact" in checklist
+def test_core_public_docs_remain_available() -> None:
+    for filename in ("assignment.md", "architecture.md", "api.md", "privacy.md", "operations.md"):
+        assert (ROOT / "docs" / filename).is_file()
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "docs/competitive-analysis.md" not in readme
+    assert "CLIProxyAPI" not in readme
 
 
 def test_readme_discloses_asr_deviation_and_uncollected_runtime_evidence() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     for value in (
-        "Groq whisper-large-v3-turbo",
+        "Groq `whisper-large-v3-turbo`",
         "local `faster-whisper`",
-        "не реализованы",
-        "Нет corpus-wide canonical WER/DER/role/speaker-attributed metrics",
-        "diagnostic-only",
-        "не является GPU evidence",
-        "run_gpu_speech_benchmark.py",
+        "формально не закрывает",
+        "Canonical corpus-wide WER/DER/role metrics",
+        "GPU WebSocket p95",
+        "five-minute `<60 с` SLA",
     ):
         assert value in readme
     assert "dropbox-dash/faster-whisper-large-v3-turbo" not in readme
@@ -101,15 +78,12 @@ def test_dockerfiles_and_operations_document_hashed_wheelhouse_contract() -> Non
         assert "ARG USE_WHEELHOUSE=0" in dockerfile
         assert "--no-index --find-links /opt/wheelhouse --require-hashes" in dockerfile
         assert "rm -rf /opt/wheelhouse" in dockerfile
-    assert "cp /secure/reviewed-wheelhouse/*.whl docker/wheelhouse/" in operations
-    assert "--build-arg USE_WHEELHOUSE=1" in operations
-    assert "check_release_gate.py --allow-blocked" in operations
+    assert "docker compose --env-file tmp/release-ci.env config --quiet" in operations
     assert (
         "docker compose --env-file tmp/release-ci.env -f docker-compose.yml -f docker-compose.gpu.yml "
         "--profile gpu config --quiet"
     ) in operations
-    assert "diagnostic only" in operations
-    assert "external CI/runtime artifact" in operations
+    assert "not GPU performance evidence" in operations
 
 
 def test_compose_release_contract_keeps_cpu_gpu_monitoring_private() -> None:

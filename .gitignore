@@ -19,3 +19,18 @@ models/artifacts/
 models/*
 !models/.gitkeep
 !models/manifest.json
+
+# Internal project workflow and generated evidence stay local.
+/.claude/
+/artifacts/
+/release/
+/evals/competitors/
+/docker-compose.cloudflare.yml
+/docs/competitive-analysis.md
+/.github/workflows/competitive-benchmark.yml
+/scripts/analyze_competitors.py
+/scripts/competitor_common.py
+/scripts/fetch_competitor_metadata.py
+/scripts/provision_cloudflare_tunnel.py
+/tests/competitors/
+/tests/unit/test_cloudflare_provisioner.py

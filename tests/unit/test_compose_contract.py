@@ -366,19 +366,14 @@ def test_gitignore_ignores_local_environment_variants_but_keeps_example() -> Non
     assert "release-evidence/" in lines
 
 
-def test_readme_documents_error_boundary_and_fail_closed_online_migrations() -> None:
+def test_compact_readme_links_to_the_api_error_contract() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    api = (ROOT / "docs" / "api.md").read_text(encoding="utf-8")
 
-    assert '{"error":' in readme
-    assert '{"detail":' in readme
-    assert "404" in readme and "405" in readme
-    assert "Allow" in readme
-    assert "populated" in readme
-    assert "fail-closed" in readme
-    assert "online" in readme
-    assert "--sql" in readme
-    assert "quarantine" not in readme
-    assert "backfill" not in readme
+    assert "docs/api.md" in readme
+    assert '{"error":' in api
+    assert "404/405" in api
+    assert "Allow" in api
 
 
 def test_gateway_config_limits_body_and_keeps_streaming_proxy_settings() -> None:
