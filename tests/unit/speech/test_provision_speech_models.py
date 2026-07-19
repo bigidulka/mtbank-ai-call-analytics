@@ -18,6 +18,9 @@ def test_model_sources_require_pinned_local_asr_and_community_one() -> None:
     asr = sources.sources["asr"]
     assert asr.model_id == "dropbox-dash/faster-whisper-large-v3-turbo"
     assert asr.package.name == "faster-whisper"
+    assert asr.expected_artifact_content_sha256 == (
+        "2dc8cda8797a061fbf98fcc8243d11e77af826b3ec04b9f6a259af976a1dfdc8"
+    )
     assert asr.gated is False
     source = sources.sources["diarization"]
     assert source.repo_id == "pyannote/speaker-diarization-community-1"

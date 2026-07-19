@@ -7,7 +7,7 @@
       "expected_resolved_repo_id": "dropbox-dash/faster-whisper-large-v3-turbo",
       "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
       "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
-      "expected_artifact_content_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18",
+      "expected_artifact_content_sha256": "2dc8cda8797a061fbf98fcc8243d11e77af826b3ec04b9f6a259af976a1dfdc8",
       "license": "MIT",
       "gated": false,
       "relative_path": "asr",
