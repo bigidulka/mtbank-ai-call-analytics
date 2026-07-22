@@ -22,10 +22,12 @@ models/*
 
 # Internal project workflow and generated evidence stay local.
 /.claude/
+/.pi-subagents/
 /artifacts/
 /release/
 /evals/competitors/
 /docker-compose.cloudflare.yml
+/deploy/runpod/env.local
 /docs/competitive-analysis.md
 /.github/workflows/competitive-benchmark.yml
 /scripts/analyze_competitors.py

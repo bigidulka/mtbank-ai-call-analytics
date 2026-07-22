@@ -3,11 +3,13 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
+from mtbank_ai.domain.provenance import ComponentRevision
 from mtbank_ai.speech.contracts import SpeechFile, SpeechTranscriptionResponse
 from mtbank_ai.speech.streaming import StreamingStart, StreamingUpdate
 from services.speech.app import create_app
 from services.speech.settings import (
     GroqTranscriptionSettings,
+    SpeechAccessSettings,
     SpeechRuntimeSettings,
     SpeechSettings,
     SpeechStreamingSettings,
@@ -46,6 +48,24 @@ class _Runtime:
     async def ready(self) -> bool:
         return True
 
+    def model_revisions(self) -> tuple[ComponentRevision, ComponentRevision]:
+        return (
+            ComponentRevision(
+                package="faster-whisper",
+                package_version="test",
+                model_id="test",
+                model_revision="test",
+                artifact_sha256="a" * 64,
+            ),
+            ComponentRevision(
+                package="pyannote.audio",
+                package_version="test",
+                model_id="test",
+                model_revision="test",
+                artifact_sha256="b" * 64,
+            ),
+        )
+
     async def close(self) -> None:
         return None
 
@@ -55,6 +75,7 @@ def test_internal_streaming_api_emits_unstable_first_partial_and_final(tmp_path)
     settings = SpeechSettings(
         runtime=SpeechRuntimeSettings(temp_root=str(tmp_path / "work")),
         groq=GroqTranscriptionSettings(api_key=SecretStr("test-groq-key")),
+        access=SpeechAccessSettings(mode="internal"),
         streaming=SpeechStreamingSettings(enabled=True),
     )
     app = create_app(settings=settings, runtime=runtime)

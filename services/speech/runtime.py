@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Protocol, cast
 
+from mtbank_ai.domain.provenance import ComponentRevision
 from mtbank_ai.policies import PolicyLoadError, PolicyRegistry
 from mtbank_ai.speech.contracts import SpeechFile, SpeechTranscriptionResponse
 from mtbank_ai.speech.roles import PolicyRoleResolver, RoleResolverPort
@@ -29,6 +30,8 @@ class SpeechRuntimePort(Protocol):
     async def transcribe(self, source: SpeechFile) -> SpeechTranscriptionResponse: ...
 
     async def ready(self) -> bool: ...
+
+    def model_revisions(self) -> tuple[ComponentRevision, ComponentRevision]: ...
 
     async def close(self) -> None: ...
 
@@ -75,11 +78,39 @@ class LazySpeechRuntime:
         self._admission_lock = asyncio.Lock()
         self._outstanding = 0
         self._fatal_provider_failure = False
+        self._warmup_complete = False
+        self._warmup_lock = asyncio.Lock()
 
     async def ready(self) -> bool:
-        if self._fatal_provider_failure:
-            return False
-        return await asyncio.to_thread(self._registry.verify_ready)
+        if self._settings.runtime.device == "cuda":
+            return not self._fatal_provider_failure and self._warmup_complete
+        return not self._fatal_provider_failure and await asyncio.to_thread(self._registry.verify_ready)
+
+    def model_revisions(self) -> tuple[ComponentRevision, ComponentRevision]:
+        """Return only verified model provenance, never artifact content or paths."""
+
+        return self._registry.asr_revision(), self._registry.diarization_revision()
+
+    async def warmup(self) -> None:
+        """Eagerly initialize CUDA models within the request timeout bound."""
+
+        if self._settings.runtime.device != "cuda":
+            return
+        try:
+            async with self._warmup_lock:
+                if self._warmup_complete or self._fatal_provider_failure:
+                    return
+                async with asyncio.timeout(self._settings.runtime.request_timeout_seconds):
+                    engine = await self._get_engine()
+                    await asyncio.to_thread(engine.warm)
+                self._warmup_complete = True
+        except asyncio.CancelledError:
+            # A cancelled CUDA model load has unknown device state. Fail closed permanently.
+            self._fatal_provider_failure = True
+            raise
+        except Exception as error:
+            self._fatal_provider_failure = True
+            raise SpeechConfigurationError("CUDA speech model warmup failed") from error
 
     async def transcribe(self, source: SpeechFile) -> SpeechTranscriptionResponse:
         await self._reserve_slot()
@@ -219,6 +250,9 @@ class UnavailableSpeechRuntime:
 
     async def ready(self) -> bool:
         return False
+
+    def model_revisions(self) -> tuple[ComponentRevision, ComponentRevision]:
+        raise SpeechConfigurationError("speech runtime configuration is unavailable")
 
     async def close(self) -> None:
         return None

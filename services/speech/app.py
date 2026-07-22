@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import inspect
 import json
+import logging
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Any, cast
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from starlette.datastructures import FormData, UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -19,7 +22,8 @@ from starlette.formparsers import MultiPartException
 from mtbank_ai.api.body_limits import BodyLimitMiddleware
 from mtbank_ai.api.error_handlers import install_error_handlers
 from mtbank_ai.api.schemas import HealthResponse
-from mtbank_ai.domain.errors import DomainError, ErrorCode, ErrorResponse
+from mtbank_ai.domain.errors import DomainError, ErrorCode, ErrorResponse, build_error_response
+from mtbank_ai.domain.provenance import ComponentRevision
 from mtbank_ai.speech.contracts import SpeechFile, SpeechMetadata, SpeechTranscriptionResponse
 from mtbank_ai.speech.roles import RoleResolutionRequiredError
 from mtbank_ai.speech.streaming import (
@@ -44,26 +48,33 @@ from services.speech.errors import (
 from services.speech.runtime import LazySpeechRuntime, SpeechRuntimePort, StreamingRuntimePort, UnavailableSpeechRuntime
 from services.speech.settings import (
     FasterWhisperSettings,
+    SpeechAccessSettings,
     SpeechModelSettings,
     SpeechRuntimeSettings,
     SpeechSettings,
 )
 
+_LOGGER = logging.getLogger(__name__)
 _MULTIPART_RESERVE_BYTES = 64 * 1024
 _TRANSCRIBE_PATHS = frozenset({"/v1/transcribe", "/v1/transcribe/"})
 
+_UNAUTHENTICATED_RESPONSE = {401: {"model": ErrorResponse, "description": "Bearer authentication is required"}}
+
 _ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
-    status: {"model": ErrorResponse, "description": description}
-    for status, description in (
-        (409, "Нужно подтвердить роли говорящих"),
-        (413, "Превышен допустимый размер"),
-        (415, "Неподдерживаемый media type"),
-        (422, "Некорректное аудио или metadata"),
-        (429, "Speech queue заполнена"),
-        (502, "ASR provider завершился с ошибкой"),
-        (503, "Локальные model artifacts не готовы"),
-        (504, "Истёк deadline обработки"),
-    )
+    **_UNAUTHENTICATED_RESPONSE,
+    **{
+        status: {"model": ErrorResponse, "description": description}
+        for status, description in (
+            (409, "Нужно подтвердить роли говорящих"),
+            (413, "Превышен допустимый размер"),
+            (415, "Неподдерживаемый media type"),
+            (422, "Некорректное аудио или metadata"),
+            (429, "Speech queue заполнена"),
+            (502, "ASR provider завершился с ошибкой"),
+            (503, "Локальные model artifacts не готовы"),
+            (504, "Истёк deadline обработки"),
+        )
+    },
 }
 
 
@@ -74,14 +85,26 @@ def create_app(
     resolved_settings, settings_failed = _resolve_settings(settings)
     resolved_runtime = runtime or _build_runtime(resolved_settings, settings_failed)
     resolved_streaming_runtime = _streaming_runtime(resolved_runtime)
+    warmup_task: asyncio.Task[bool] | None = None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        nonlocal warmup_task
         del app
-        yield
-        result = resolved_runtime.close()
-        if inspect.isawaitable(result):
-            await result
+        if resolved_settings.runtime.device == "cuda" and isinstance(resolved_runtime, LazySpeechRuntime):
+            # A failed model load does not kill liveness, but it permanently fails readiness.
+            warmup_task = asyncio.create_task(_warmup_cuda_runtime(resolved_runtime))
+        try:
+            yield
+        finally:
+            if warmup_task is not None:
+                # asyncio cannot force-cancel an active to_thread worker; warmup marks CUDA fatal instead.
+                warmup_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await warmup_task
+            result = resolved_runtime.close()
+            if inspect.isawaitable(result):
+                await result
 
     app = FastAPI(title="MTBank Canonical Speech Service", version="0.1.0", lifespan=lifespan)
     app.state.settings = resolved_settings
@@ -98,6 +121,20 @@ def create_app(
     async def request_context(request: Request, call_next: Any) -> Response:
         request_id = _request_id_from_header(request.headers.get("x-request-id"))
         request.state.request_id = request_id
+        if settings_failed and request.url.path != "/health/live":
+            status, body = build_error_response(DomainError(ErrorCode.SERVICE_UNAVAILABLE), request_id)
+            return JSONResponse(
+                status_code=status,
+                content=body.model_dump(mode="json"),
+                headers={"X-Request-ID": str(request_id)},
+            )
+        if not _request_is_authorized(request, resolved_settings):
+            status, body = build_error_response(DomainError(ErrorCode.UNAUTHENTICATED), request_id)
+            return JSONResponse(
+                status_code=status,
+                content=body.model_dump(mode="json"),
+                headers={"X-Request-ID": str(request_id), "WWW-Authenticate": "Bearer"},
+            )
         response = await call_next(request)
         response.headers.setdefault("X-Request-ID", str(request_id))
         return response
@@ -111,13 +148,29 @@ def create_app(
     @app.get(
         "/health/ready",
         response_model=HealthResponse,
-        responses={503: {"model": ErrorResponse, "description": "Speech artifacts are unavailable"}},
+        responses={
+            **_UNAUTHENTICATED_RESPONSE,
+            503: {"model": ErrorResponse, "description": "Speech artifacts are unavailable"},
+        },
         tags=["health"],
     )
     async def ready() -> HealthResponse:
-        if not await resolved_runtime.ready():
+        if not await _runtime_is_ready(resolved_runtime, warmup_task):
             raise DomainError(ErrorCode.SERVICE_UNAVAILABLE)
         return HealthResponse(status="ready")
+
+    @app.get(
+        "/v1/runtime",
+        responses={
+            **_UNAUTHENTICATED_RESPONSE,
+            503: {"model": ErrorResponse, "description": "Speech runtime is unavailable"},
+        },
+        tags=["speech"],
+    )
+    async def runtime_attestation() -> dict[str, object]:
+        if not await _runtime_is_ready(resolved_runtime, warmup_task):
+            raise DomainError(ErrorCode.SERVICE_UNAVAILABLE)
+        return _runtime_attestation(resolved_settings, resolved_runtime)
 
     @app.post(
         "/v1/transcribe",
@@ -126,7 +179,11 @@ def create_app(
         tags=["speech"],
     )
     async def transcribe(request: Request) -> SpeechTranscriptionResponse:
+        if await _cuda_warmup_blocks_transcription(resolved_settings, resolved_runtime, warmup_task):
+            raise DomainError(ErrorCode.SERVICE_UNAVAILABLE)
         source = await _parse_source(request, resolved_settings)
+        if not await _runtime_is_ready(resolved_runtime, warmup_task):
+            raise DomainError(ErrorCode.SERVICE_UNAVAILABLE)
         try:
             return await resolved_runtime.transcribe(source)
         except UnsupportedMediaError as error:
@@ -148,6 +205,12 @@ def create_app(
 
     @app.websocket("/v1/stream")
     async def stream(websocket: WebSocket) -> None:
+        if settings_failed:
+            await websocket.close(code=1013)
+            return
+        if not _websocket_is_authorized(websocket, resolved_settings):
+            await websocket.close(code=1008)
+            return
         if (
             not resolved_settings.streaming.enabled
             or resolved_streaming_runtime is None
@@ -239,6 +302,39 @@ def create_app(
     return app
 
 
+async def _warmup_cuda_runtime(runtime: LazySpeechRuntime) -> bool:
+    try:
+        await runtime.warmup()
+    except SpeechConfigurationError:
+        _LOGGER.error('{"event":"speech_cuda_warmup_failed"}')
+        return False
+    return await runtime.ready()
+
+
+async def _runtime_is_ready(runtime: SpeechRuntimePort, warmup_task: asyncio.Task[bool] | None) -> bool:
+    if warmup_task is not None:
+        if not warmup_task.done():
+            return False
+        try:
+            if not warmup_task.result():
+                return False
+        except asyncio.CancelledError:
+            return False
+    return await runtime.ready()
+
+
+async def _cuda_warmup_blocks_transcription(
+    settings: SpeechSettings,
+    runtime: SpeechRuntimePort,
+    warmup_task: asyncio.Task[bool] | None,
+) -> bool:
+    return (
+        settings.runtime.device == "cuda"
+        and isinstance(runtime, LazySpeechRuntime)
+        and not await _runtime_is_ready(runtime, warmup_task)
+    )
+
+
 async def _within_stream_deadline(awaitable: Any, deadline: float) -> Any:
     async with asyncio.timeout_at(deadline):
         return await awaitable
@@ -300,6 +396,7 @@ def _resolve_settings(settings: SpeechSettings | None) -> tuple[SpeechSettings, 
                 faster_whisper=FasterWhisperSettings(),
                 groq=None,
                 models=SpeechModelSettings(),
+                access=SpeechAccessSettings.model_construct(mode="internal", bearer_key=None),
             ),
             True,
         )
@@ -380,6 +477,57 @@ def _parse_metadata(value: object) -> SpeechMetadata:
         return SpeechMetadata.model_validate(parsed)
     except (TypeError, ValueError, ValidationError) as error:
         raise DomainError(ErrorCode.INVALID_REQUEST) from error
+
+
+def _request_is_authorized(request: Request, settings: SpeechSettings) -> bool:
+    if settings.access.mode == "internal" or request.url.path == "/health/live":
+        return True
+    return _matches_bearer_key(request.headers.getlist("authorization"), settings)
+
+
+def _websocket_is_authorized(websocket: WebSocket, settings: SpeechSettings) -> bool:
+    if settings.access.mode == "internal":
+        return True
+    return _matches_bearer_key(websocket.headers.getlist("authorization"), settings)
+
+
+def _matches_bearer_key(authorizations: list[str], settings: SpeechSettings) -> bool:
+    if len(authorizations) != 1:
+        return False
+    authorization = authorizations[0]
+    if authorization.count(" ") != 1:
+        return False
+    scheme, presented_key = authorization.split(" ", 1)
+    configured_key = settings.access.bearer_key
+    if scheme != "Bearer" or configured_key is None or not presented_key:
+        return False
+    try:
+        return hmac.compare_digest(
+            presented_key.encode("ascii"), configured_key.get_secret_value().encode("ascii")
+        )
+    except UnicodeEncodeError:
+        return False
+
+
+def _runtime_attestation(settings: SpeechSettings, runtime: SpeechRuntimePort) -> dict[str, object]:
+    asr, diarization = runtime.model_revisions()
+    return {
+        "runtime": {
+            "device": settings.runtime.device,
+            "compute_type": settings.faster_whisper.compute_type(device=settings.runtime.device),
+            "asr": _component_attestation(asr),
+            "diarization": _component_attestation(diarization),
+        }
+    }
+
+
+def _component_attestation(component: ComponentRevision) -> dict[str, str]:
+    return {
+        "package": component.package,
+        "package_version": component.package_version,
+        "model_id": component.model_id,
+        "model_revision": component.model_revision,
+    }
 
 
 def _request_id_from_header(value: str | None) -> UUID:

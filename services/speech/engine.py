@@ -56,6 +56,11 @@ class CanonicalBatchEngine:
         self._clock = clock or (lambda: datetime.now(UTC))
         self._telemetry = telemetry or Telemetry()
 
+    def warm(self) -> None:
+        """Eagerly initialize both GPU-bound local models without processing content."""
+
+        self._ports.warm()
+
     def transcribe(self, source: SpeechFile) -> SpeechTranscriptionResponse:
         started = time.perf_counter()
         with self._normalizer.normalize(source) as audio:

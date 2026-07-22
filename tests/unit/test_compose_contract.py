@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import json
+import os
 import re
+import shutil
+import subprocess
 import tomllib
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).parents[2]
 OPENWEBUI_DIGEST = "sha256:9fcea9c6e32ab60b0498f3986c6cdf651ddbe61db48d2213a3d28048ddd673d4"
@@ -305,6 +311,53 @@ def test_api_projects_complete_fail_closed_analysis_runtime_configuration() -> N
     )
     for configuration in required_configuration:
         assert configuration in api_service
+
+
+@pytest.mark.skipif(shutil.which("docker") is None, reason="Docker Compose CLI is unavailable")
+def test_runpod_overlay_preserves_api_prerequisites_without_local_speech(tmp_path: Path) -> None:
+    base = ROOT / "docker-compose.yml"
+    overlay = ROOT / "docker-compose.runpod.yml"
+    variable_names = set(re.findall(r"\$\{([A-Z0-9_]+)(?::[^}]*)?\}", base.read_text() + overlay.read_text()))
+    values = {name: "test" for name in variable_names}
+    values.update(
+        {
+            "OPENWEBUI_PORT": "3000",
+            "MTBANK_RUNPOD_SPEECH_BASE_URL": "https://speech.example.invalid",
+            "MTBANK_RUNPOD_SPEECH_BEARER_KEY": "RunPodBearerKeyExample123",
+        }
+    )
+    env_file = tmp_path / "compose.env"
+    env_file.write_text("\n".join(f"{name}={value}" for name, value in sorted(values.items())), encoding="utf-8")
+    environment = os.environ.copy()
+    environment.update(values)
+    result = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "--env-file",
+            str(env_file),
+            "-f",
+            str(base),
+            "-f",
+            str(overlay),
+            "config",
+            "--format",
+            "json",
+        ],
+        cwd=ROOT,
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    dependencies = json.loads(result.stdout)["services"]["api"]["depends_on"]
+
+    assert {name: dependency["condition"] for name, dependency in dependencies.items()} == {
+        "secrets-preflight": "service_completed_successfully",
+        "postgres": "service_healthy",
+        "migrate": "service_completed_successfully",
+    }
 
 
 def test_starlette_is_an_exact_direct_runtime_dependency_in_project_and_lock() -> None:

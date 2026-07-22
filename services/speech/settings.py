@@ -10,6 +10,7 @@ from pydantic import HttpUrl, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from mtbank_ai.domain.base import Confidence, NonEmptyId, NonNegativeInt, PositiveFloat, PositiveInt, StrictFrozenModel
+from mtbank_ai.runtime_secrets import SecretConfigurationError, require_runtime_secret
 
 
 class FasterWhisperSettings(StrictFrozenModel):
@@ -136,6 +137,30 @@ class SpeechModelSettings(StrictFrozenModel):
     artifact_root: NonEmptyId = "/models/artifacts"
 
 
+class SpeechAccessSettings(StrictFrozenModel):
+    """Optional bearer boundary for a remotely exposed single speech container."""
+
+    mode: Literal["internal", "bearer"]
+    bearer_key: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def validate_access_mode(self) -> Self:
+        if self.mode == "internal":
+            if self.bearer_key is not None:
+                raise ValueError("internal speech access must not configure a bearer key")
+            return self
+        if self.bearer_key is None:
+            raise ValueError("bearer speech access requires a bearer key")
+        bearer_key = self.bearer_key.get_secret_value()
+        if not bearer_key.isascii():
+            raise ValueError("bearer speech access key must contain only ASCII characters")
+        try:
+            require_runtime_secret("MTBANK_SPEECH__ACCESS__BEARER_KEY", bearer_key)
+        except SecretConfigurationError as error:
+            raise ValueError("bearer speech access key is unsafe") from error
+        return self
+
+
 class SpeechSettings(BaseSettings):
     """Canonical batch needs only local artifacts; Groq is optional streaming configuration."""
 
@@ -156,6 +181,7 @@ class SpeechSettings(BaseSettings):
     groq: GroqTranscriptionSettings | None = None
     streaming: SpeechStreamingSettings = SpeechStreamingSettings()
     models: SpeechModelSettings = SpeechModelSettings()
+    access: SpeechAccessSettings
 
     @model_validator(mode="after")
     def validate_profile(self) -> Self:

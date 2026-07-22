@@ -44,14 +44,17 @@ class GroqWhisperTranscriber(TranscriberPort):
         if language != self._settings.language:
             raise SpeechProviderError("configured Groq language does not match canonical language")
         try:
-            with audio.path.open("rb") as source, self._client_factory(
-                timeout=httpx.Timeout(
-                    self._settings.request_timeout_seconds,
-                    connect=self._settings.connect_timeout_seconds,
-                ),
-                trust_env=False,
-                follow_redirects=False,
-            ) as client:
+            with (
+                audio.path.open("rb") as source,
+                self._client_factory(
+                    timeout=httpx.Timeout(
+                        self._settings.request_timeout_seconds,
+                        connect=self._settings.connect_timeout_seconds,
+                    ),
+                    trust_env=False,
+                    follow_redirects=False,
+                ) as client,
+            ):
                 with client.stream(
                     "POST",
                     str(self._settings.endpoint),
@@ -102,6 +105,9 @@ class FasterWhisperTranscriber(TranscriberPort):
         self._device = device
         self._model_factory = model_factory
         self._model: Any | None = None
+
+    def warm(self) -> None:
+        self._get_model()
 
     def transcribe(self, audio: NormalizedAudio, *, language: str) -> TranscriptionResult:
         if language != self._settings.language:
@@ -238,6 +244,9 @@ class PyannoteCommunityDiarizer(DiarizerPort):
         self._model_path = model_path
         self._device = device
         self._pipeline: Any | None = None
+
+    def warm(self) -> None:
+        self._get_pipeline()
 
     def diarize(self, audio: NormalizedAudio) -> tuple[DiarizationTurn, ...]:
         try:
@@ -385,9 +394,7 @@ def _recognized_segment(raw: object, words: tuple[RecognizedWord, ...]) -> Recog
         segment_words = tuple(
             word
             for word in words
-            if _overlap(start, end, word.start, word.end) > 0.0
-            and word.start >= start
-            and word.end <= end
+            if _overlap(start, end, word.start, word.end) > 0.0 and word.start >= start and word.end <= end
         )
         return RecognizedSegment(start=start, end=end, text=text, words=segment_words)
     except (KeyError, ValueError) as error:

@@ -7,6 +7,7 @@ services:
     profiles:
       - gpu
     environment:
+      MTBANK_SPEECH__ACCESS__MODE: internal
       MTBANK_SPEECH__RUNTIME__DEVICE: cuda
       MTBANK_SPEECH__RUNTIME__COMPUTE_TYPE: float16
     deploy:

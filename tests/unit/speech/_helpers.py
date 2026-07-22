@@ -8,6 +8,7 @@ from pydantic import SecretStr
 from services.speech.manifest import ModelArtifact, ModelRegistry, SpeechModelManifest, artifact_tree_sha256
 from services.speech.settings import (
     GroqTranscriptionSettings,
+    SpeechAccessSettings,
     SpeechModelSettings,
     SpeechRuntimeSettings,
     SpeechSettings,
@@ -50,6 +51,7 @@ def make_registry(
     settings = SpeechSettings(
         runtime=resolved_runtime,
         groq=GroqTranscriptionSettings(api_key=SecretStr("test-groq-key")),
+        access=SpeechAccessSettings(mode="internal"),
         models=SpeechModelSettings(manifest_path=str(manifest_path), artifact_root=str(artifact_root)),
     )
     return ModelRegistry.load(settings), settings

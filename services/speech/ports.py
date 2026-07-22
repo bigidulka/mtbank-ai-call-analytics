@@ -17,6 +17,11 @@ class TranscriberPort:
     def transcribe(self, audio: NormalizedAudio, *, language: str) -> TranscriptionResult:
         raise NotImplementedError
 
+    def warm(self) -> None:
+        """Load local model state before an externally visible GPU readiness signal."""
+
+        return None
+
 
 class AlignerPort:
     def align(
@@ -32,6 +37,11 @@ class AlignerPort:
 class DiarizerPort:
     def diarize(self, audio: NormalizedAudio) -> tuple[DiarizationTurn, ...]:
         raise NotImplementedError
+
+    def warm(self) -> None:
+        """Load local model state before an externally visible GPU readiness signal."""
+
+        return None
 
 
 class SpeakerAssignerPort:
@@ -49,3 +59,7 @@ class SpeechPorts:
     aligner: AlignerPort
     diarizer: DiarizerPort
     speaker_assigner: SpeakerAssignerPort
+
+    def warm(self) -> None:
+        self.transcriber.warm()
+        self.diarizer.warm()

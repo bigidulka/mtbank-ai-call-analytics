@@ -52,6 +52,8 @@ MTBANK_WEBSOCKET_ALLOWED_ORIGIN=https://example.org \
 
 API contract: [`docs/api.md`](docs/api.md). Архитектура и privacy boundary: [`docs/architecture.md`](docs/architecture.md), [`docs/privacy.md`](docs/privacy.md).
 
+RunPod GPU Pod запускает только GPU speech container; он не запускает Docker Compose. Split-GPU deployment foundation и remote bearer boundary: [`deploy/runpod/README.md`](deploy/runpod/README.md).
+
 ## Проверка
 
 ```bash

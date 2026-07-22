@@ -20,6 +20,7 @@ from mtbank_ai.domain.transcript import (
 from mtbank_ai.policies import PolicyRegistry
 from mtbank_ai.speech.contracts import SpeechFile, SpeechTranscriptionResponse
 from services.speech.app import create_app
+from services.speech.settings import SpeechAccessSettings, SpeechSettings
 
 
 class PolicyRuntime:
@@ -32,6 +33,16 @@ class PolicyRuntime:
 
     async def ready(self) -> bool:
         return True
+
+    def model_revisions(self) -> tuple[ComponentRevision, ComponentRevision]:
+        revision = ComponentRevision(
+            package="test-package",
+            package_version="1.0.0",
+            model_id="test-model",
+            model_revision="test/v1",
+            artifact_sha256="a" * 64,
+        )
+        return revision, revision
 
     async def close(self) -> None:
         return None
@@ -121,7 +132,11 @@ def _response() -> SpeechTranscriptionResponse:
 def test_speech_api_serializes_policy_role_provenance_without_raw_evidence() -> None:
     async def scenario() -> None:
         policy = PolicyRegistry().roles
-        transport = httpx.ASGITransport(app=create_app(runtime=PolicyRuntime()))
+        app = create_app(
+            settings=SpeechSettings(access=SpeechAccessSettings(mode="internal")),
+            runtime=PolicyRuntime(),
+        )
+        transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://speech.test") as client:
             response = await client.post(
                 "/v1/transcribe",

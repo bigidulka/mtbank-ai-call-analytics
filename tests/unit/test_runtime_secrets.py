@@ -38,3 +38,9 @@ def test_preflight_rejects_unsafe_value_for_every_secret(name: str, unsafe_value
 
 def test_preflight_accepts_distinct_long_runtime_secrets() -> None:
     validate_runtime_secrets(_SAFE_SECRETS)
+
+
+def test_preflight_does_not_require_opt_in_groq_secret() -> None:
+    environment = {name: value for name, value in _SAFE_SECRETS.items() if name != "GROQ_API_KEY"}
+
+    validate_runtime_secrets(environment)

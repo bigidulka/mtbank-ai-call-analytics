@@ -386,6 +386,7 @@ services:
       context: .
       dockerfile: docker/speech.cpu.Dockerfile
     environment:
+      MTBANK_SPEECH__ACCESS__MODE: internal
       MTBANK_SPEECH__RUNTIME__DEVICE: cpu
       MTBANK_SPEECH__RUNTIME__LANGUAGE: ru
       MTBANK_SPEECH__RUNTIME__PIPELINE_REVISION: speech/local-faster-whisper-v1

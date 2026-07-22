@@ -17,7 +17,7 @@ from scripts.evaluate_speech import (
     speaker_attributed_wer,
     time_weighted_role_accuracy,
 )
-from services.speech.settings import SpeechRuntimeSettings, SpeechSettings
+from services.speech.settings import SpeechAccessSettings, SpeechRuntimeSettings, SpeechSettings
 from tests.unit.speech._helpers import make_registry
 
 ROOT = Path(__file__).parents[3]
@@ -197,17 +197,27 @@ def test_model_registry_rechecks_artifacts_after_a_successful_readiness_probe(tm
     assert not registry.verify_ready()
 
 
-def test_typed_speech_settings_supports_local_batch_without_groq_secret() -> None:
-    settings = SpeechSettings.model_validate({"runtime": SpeechRuntimeSettings().model_dump()})
+def test_typed_speech_settings_requires_explicit_access_mode() -> None:
+    with pytest.raises(ValidationError, match="access"):
+        SpeechSettings.model_validate({"runtime": SpeechRuntimeSettings().model_dump()})
+
+    settings = SpeechSettings.model_validate(
+        {"runtime": SpeechRuntimeSettings().model_dump(), "access": {"mode": "internal"}}
+    )
 
     assert settings.groq is None
+    assert settings.access == SpeechAccessSettings(mode="internal")
     assert settings.faster_whisper.model_id == "dropbox-dash/faster-whisper-large-v3-turbo"
 
 
 def test_typed_speech_settings_requires_groq_only_for_enabled_streaming() -> None:
     with pytest.raises(ValidationError, match="Groq"):
         SpeechSettings.model_validate(
-            {"runtime": SpeechRuntimeSettings().model_dump(), "streaming": {"enabled": True}}
+            {
+                "runtime": SpeechRuntimeSettings().model_dump(),
+                "streaming": {"enabled": True},
+                "access": {"mode": "internal"},
+            }
         )
 
 
@@ -216,6 +226,10 @@ def test_speech_images_profiles_and_lock_are_staticly_pinned() -> None:
     gpu = (ROOT / "docker" / "speech.gpu.Dockerfile").read_text(encoding="utf-8")
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     gpu_compose = (ROOT / "docker-compose.gpu.yml").read_text(encoding="utf-8")
+    runpod_compose = (ROOT / "docker-compose.runpod.yml").read_text(encoding="utf-8")
+    runpod_env = (ROOT / "deploy" / "runpod" / "env.example").read_text(encoding="utf-8")
+    runpod_readme = (ROOT / "deploy" / "runpod" / "README.md").read_text(encoding="utf-8")
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
     project = tomllib.loads((ROOT / "services" / "speech" / "pyproject.toml").read_text(encoding="utf-8"))
     lock = tomllib.loads((ROOT / "services" / "speech" / "uv.lock").read_text(encoding="utf-8"))
 
@@ -255,17 +269,31 @@ def test_speech_images_profiles_and_lock_are_staticly_pinned() -> None:
         assert "--require-hashes" in dockerfile
     assert "  speech:\n" in compose
     assert "docker/speech.cpu.Dockerfile" in compose
-    assert "MTBANK_SPEECH__STREAMING__ENABLED: \"false\"" in compose
-    assert "MTBANK_SPEECH__STREAMING__MAX_UPDATE_TEXT_BYTES: \"49152\"" in compose
-    assert "MTBANK_SPEECH__STREAMING__ROLLING_STEP_SECONDS: \"1.5\"" in compose
-    assert "MTBANK_SPEECH__STREAMING__MAX_CONCURRENT_ROLLING_CALLS: \"1\"" in compose
+    assert "MTBANK_SPEECH__ACCESS__MODE: internal" in compose
+    assert 'MTBANK_SPEECH__STREAMING__ENABLED: "false"' in compose
+    assert 'MTBANK_SPEECH__STREAMING__MAX_UPDATE_TEXT_BYTES: "49152"' in compose
+    assert 'MTBANK_SPEECH__STREAMING__ROLLING_STEP_SECONDS: "1.5"' in compose
+    assert 'MTBANK_SPEECH__STREAMING__MAX_CONCURRENT_ROLLING_CALLS: "1"' in compose
     assert "MTBANK_SPEECH__STREAMING_PATH: /v1/stream" in compose
     assert "      - application-internal" in compose
     assert '      - "8010"' in compose
     assert "profiles:\n      - gpu" in gpu_compose
     assert "docker/speech.gpu.Dockerfile" in gpu_compose
+    assert "MTBANK_SPEECH__ACCESS__MODE: internal" in gpu_compose
     assert "capabilities:\n                - gpu" in gpu_compose
-    assert "HF_TOKEN" not in compose + gpu_compose
+    assert "HF_TOKEN" not in compose + gpu_compose + runpod_compose
+    assert "MTBANK_SPEECH__MODE: remote_https" in runpod_compose
+    assert "MTBANK_RUNPOD_SPEECH_BASE_URL" in runpod_compose
+    assert "MTBANK_RUNPOD_SPEECH_BEARER_KEY" in runpod_compose
+    assert "MTBANK_SPEECH__ACCESS__MODE=bearer" in runpod_env
+    assert "MTBANK_SPEECH__ACCESS__BEARER_KEY" in runpod_env
+    assert "MTBANK_SPEECH__ACCESS__MODE=bearer" in runpod_readme
+    assert "/.pi-subagents/" in dockerignore.splitlines()
+    assert "/deploy/runpod/env.local" in dockerignore.splitlines()
+    assert "Docker Compose or nested Docker" in runpod_readme
+    assert "before container start or CUDA warmup" in runpod_readme
+    assert "Docker-ignored" in runpod_readme
+    assert "image@sha256" in runpod_readme
 
 
 def test_manifest_is_json_compatible_yaml_for_dependency_free_validation() -> None:
@@ -277,7 +305,7 @@ def test_manifest_is_json_compatible_yaml_for_dependency_free_validation() -> No
 def test_websocket_overlay_requires_explicit_origin_and_enables_both_boundaries() -> None:
     overlay = (ROOT / "docker-compose.websocket.yml").read_text(encoding="utf-8")
 
-    assert "MTBANK_WEBSOCKET__ENABLED: \"true\"" in overlay
-    assert "MTBANK_SPEECH__STREAMING__ENABLED: \"true\"" in overlay
+    assert 'MTBANK_WEBSOCKET__ENABLED: "true"' in overlay
+    assert 'MTBANK_SPEECH__STREAMING__ENABLED: "true"' in overlay
     assert "${MTBANK_WEBSOCKET_ALLOWED_ORIGIN:?set MTBANK_WEBSOCKET_ALLOWED_ORIGIN in .env}" in overlay
     assert "ports:" not in overlay

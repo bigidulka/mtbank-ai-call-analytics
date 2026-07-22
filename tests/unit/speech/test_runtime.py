@@ -93,6 +93,137 @@ def test_runtime_releases_slot_after_each_successful_request(tmp_path) -> None:
     asyncio.run(scenario())
 
 
+def test_cpu_readiness_cancellation_does_not_poison_future_probes(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, settings = make_registry(tmp_path)
+    started = Event()
+    release = Event()
+
+    def verify_ready() -> bool:
+        started.set()
+        assert release.wait(timeout=3.0)
+        return True
+
+    async def scenario() -> None:
+        runtime = LazySpeechRuntime(settings)
+        monkeypatch.setattr(runtime._registry, "verify_ready", verify_ready)
+        task = asyncio.create_task(runtime.ready())
+        assert await asyncio.to_thread(started.wait, 1.0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        release.set()
+        assert await runtime.ready()
+
+    asyncio.run(scenario())
+
+
+def test_cuda_readiness_is_status_only_after_successful_warmup(tmp_path) -> None:
+    runtime_settings = SpeechRuntimeSettings(device="cuda", temp_root=str(tmp_path / "work"))
+    _, settings = make_registry(tmp_path, runtime=runtime_settings)
+    warm_calls = 0
+
+    class WarmEngine:
+        def warm(self) -> None:
+            nonlocal warm_calls
+            warm_calls += 1
+
+    def factory(registry, runtime, faster_whisper, resolver):
+        del registry, runtime, faster_whisper, resolver
+        return cast(object, WarmEngine())
+
+    async def scenario() -> None:
+        runtime = LazySpeechRuntime(settings, engine_factory=factory)  # type: ignore[arg-type]
+        assert not await runtime.ready()
+        assert warm_calls == 0
+        await runtime.warmup()
+        assert await runtime.ready()
+        assert warm_calls == 1
+
+    asyncio.run(scenario())
+
+
+def test_cuda_readiness_propagates_cancellation_and_fails_closed(tmp_path) -> None:
+    runtime_settings = SpeechRuntimeSettings(device="cuda", temp_root=str(tmp_path / "work"))
+    _, settings = make_registry(tmp_path, runtime=runtime_settings)
+    started = Event()
+    release = Event()
+
+    class WarmEngine:
+        def warm(self) -> None:
+            started.set()
+            assert release.wait(timeout=3.0)
+
+    def factory(registry, runtime, faster_whisper, resolver):
+        del registry, runtime, faster_whisper, resolver
+        return cast(object, WarmEngine())
+
+    async def scenario() -> None:
+        runtime = LazySpeechRuntime(settings, engine_factory=factory)  # type: ignore[arg-type]
+        task = asyncio.create_task(runtime.warmup())
+        assert await asyncio.to_thread(started.wait, 1.0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        release.set()
+        assert not await runtime.ready()
+
+    asyncio.run(scenario())
+
+
+def test_cuda_readiness_fails_closed_when_warmup_times_out(tmp_path) -> None:
+    runtime_settings = SpeechRuntimeSettings(
+        device="cuda",
+        temp_root=str(tmp_path / "work"),
+        request_timeout_seconds=0.01,
+    )
+    _, settings = make_registry(tmp_path, runtime=runtime_settings)
+    started = Event()
+    release = Event()
+
+    class WarmEngine:
+        def warm(self) -> None:
+            started.set()
+            assert release.wait(timeout=3.0)
+
+    def factory(registry, runtime, faster_whisper, resolver):
+        del registry, runtime, faster_whisper, resolver
+        return cast(object, WarmEngine())
+
+    async def scenario() -> None:
+        runtime = LazySpeechRuntime(settings, engine_factory=factory)  # type: ignore[arg-type]
+        with pytest.raises(SpeechConfigurationError):
+            await runtime.warmup()
+        assert await asyncio.to_thread(started.wait, 1.0)
+        assert not await runtime.ready()
+        release.set()
+
+    asyncio.run(scenario())
+
+
+def test_cuda_readiness_fails_closed_when_model_warmup_fails(tmp_path) -> None:
+    runtime_settings = SpeechRuntimeSettings(device="cuda", temp_root=str(tmp_path / "work"))
+    _, settings = make_registry(tmp_path, runtime=runtime_settings)
+
+    class FailingWarmEngine:
+        def warm(self) -> None:
+            raise RuntimeError("model load failed")
+
+    def factory(registry, runtime, faster_whisper, resolver):
+        del registry, runtime, faster_whisper, resolver
+        return cast(object, FailingWarmEngine())
+
+    async def scenario() -> None:
+        runtime = LazySpeechRuntime(settings, engine_factory=factory)  # type: ignore[arg-type]
+        with pytest.raises(SpeechConfigurationError):
+            await runtime.warmup()
+        assert not await runtime.ready()
+
+    asyncio.run(scenario())
+
+
 def test_runtime_rechecks_artifacts_before_first_adapter_graph_load(tmp_path) -> None:
     _, settings = make_registry(tmp_path)
     factory_calls = 0

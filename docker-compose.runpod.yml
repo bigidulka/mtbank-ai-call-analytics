@@ -1,0 +1,19 @@
+# Split deployment: local Compose keeps the app plane; RunPod hosts only the GPU speech image.
+# RunPod GPU Pods do not run Docker Compose or nested Docker.
+services:
+  api:
+    depends_on: !override
+      secrets-preflight:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      MTBANK_SPEECH__MODE: remote_https
+      MTBANK_SPEECH__BASE_URL: ${MTBANK_RUNPOD_SPEECH_BASE_URL:?set public HTTPS RunPod speech URL}
+      MTBANK_SPEECH__API_KEY: ${MTBANK_RUNPOD_SPEECH_BEARER_KEY:?set RunPod speech bearer key}
+
+  speech:
+    profiles:
+      - local-speech
