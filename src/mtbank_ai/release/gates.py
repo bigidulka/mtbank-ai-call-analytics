@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mtbank_ai.release.evidence import EvidenceValidationError, validate_evidence
-from services.speech.manifest import ModelRegistry, SpeechModelManifest
+from mtbank_ai.release.model_manifest import ModelRegistry, SpeechModelManifest
 
 _REQUIRED_CLOUD_VARIABLES = (
     "MTBANK_AGENT_RUNTIME__GATEWAY__BASE_URL",
@@ -24,6 +24,13 @@ _EVIDENCE_FILES = (
     ("grafana_browser_proof", "grafana-browser-proof.json", "grafana-browser-proof"),
     ("websocket_gpu_p95", "websocket-gpu-p95.json", "websocket-gpu-p95"),
     ("canonical_app_image", "canonical-app-image.json", "canonical-app-image"),
+)
+RELEASE_GATE_IDS = (
+    "licensed_corpus",
+    "independent_external_attestation",
+    "local_model_artifacts",
+    "cloud_gateway_credentials",
+    *(item[0] for item in _EVIDENCE_FILES),
 )
 
 
@@ -60,6 +67,7 @@ def evaluate_release_gate(context: ReleaseGateContext) -> dict[str, object]:
     current_code_sha = _current_code_sha(context)
     results = (
         _licensed_corpus(context, current_code_sha),
+        _independent_external_attestation(),
         _model_artifacts(context, current_code_sha),
         _cloud_credentials(context),
         *(
@@ -75,6 +83,12 @@ def evaluate_release_gate(context: ReleaseGateContext) -> dict[str, object]:
         "blocked": blocked,
         "gates": [result.as_dict() for result in results],
     }
+
+
+def release_gate_ids() -> tuple[str, ...]:
+    """Returns the versioned authoritative release-gate identifiers."""
+
+    return RELEASE_GATE_IDS
 
 
 def require_real_llm_environment(environment: Mapping[str, str]) -> tuple[str, ...]:
@@ -93,6 +107,17 @@ def _licensed_corpus(context: ReleaseGateContext, current_code_sha: str | None) 
         )
     path = Path(configured)
     return _typed_evidence_file(context, "licensed_corpus", path, "licensed-corpus-manifest", current_code_sha)
+
+
+def _independent_external_attestation() -> GateResult:
+    """Локальные hashes не могут подтвердить external независимую проверку."""
+
+    return GateResult(
+        "independent_external_attestation",
+        "blocked",
+        "Требуется отдельное external независимое подтверждение; declared digest и reviewer reference hash "
+        "его не заменяют.",
+    )
 
 
 def _model_artifacts(context: ReleaseGateContext, current_code_sha: str | None) -> GateResult:

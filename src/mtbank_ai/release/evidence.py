@@ -44,7 +44,9 @@ _REAL_TRACE_PROVENANCE: Final = frozenset(
 )
 _EVIDENCE_SCHEMAS: Final = {
     "licensed-corpus-manifest": (
-        frozenset({"license_document_sha256", "manifest_source_sha256", "reviewer_id_sha256", "dataset_revision"}),
+        frozenset(
+            {"license_document_sha256", "manifest_source_sha256", "reviewer_reference_sha256", "dataset_revision"}
+        ),
         frozenset({"reference_transcript_count", "role_label_count"}),
         frozenset({"dataset_id"}),
     ),
@@ -56,7 +58,7 @@ _EVIDENCE_SCHEMAS: Final = {
                 "diarization_artifact_sha256",
                 "asr_model_revision",
                 "diarization_model_revision",
-                "reviewer_id_sha256",
+                "reviewer_reference_sha256",
             }
         ),
         frozenset({"artifact_count", "asr_file_count", "diarization_file_count"}),
@@ -70,10 +72,10 @@ _EVIDENCE_SCHEMAS: Final = {
     "gpu-benchmark": (
         frozenset(
             {
-                "image_digest",
+                "declared_image_digest",
                 "model_manifest_sha256",
                 "runner_id_sha256",
-                "runtime_attestation_sha256",
+                "app_runtime_binding_sha256",
                 "workload_revision",
             }
         ),
@@ -88,10 +90,10 @@ _EVIDENCE_SCHEMAS: Final = {
     "websocket-gpu-p95": (
         frozenset(
             {
-                "image_digest",
+                "declared_image_digest",
                 "model_manifest_sha256",
                 "runner_id_sha256",
-                "runtime_attestation_sha256",
+                "app_runtime_binding_sha256",
                 "workload_revision",
             }
         ),
@@ -99,7 +101,7 @@ _EVIDENCE_SCHEMAS: Final = {
         frozenset(),
     ),
     "canonical-app-image": (
-        frozenset({"dockerfile_sha256", "image_digest", "lock_sha256", "runner_id_sha256"}),
+        frozenset({"dockerfile_sha256", "declared_image_digest", "lock_sha256", "runner_id_sha256"}),
         frozenset({"build_duration_seconds"}),
         frozenset(),
     ),

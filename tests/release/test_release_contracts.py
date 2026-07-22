@@ -96,7 +96,7 @@ def _local_model_evidence_root(tmp_path: Path) -> tuple[Path, dict[str, object]]
             "diarization_artifact_sha256": manifest.diarization.artifact_sha256,
             "asr_model_revision": manifest.asr.model_revision,
             "diarization_model_revision": manifest.diarization.model_revision,
-            "reviewer_id_sha256": "1" * 64,
+            "reviewer_reference_sha256": "1" * 64,
         },
         metrics={"artifact_count": 2, "asr_file_count": 1, "diarization_file_count": 1},
         observations={"model_set_id": "local-test"},
@@ -130,6 +130,14 @@ def test_local_model_evidence_gate_accepts_verified_manifest_artifacts_and_bindi
 
     gate = _local_model_gate_result(manifest)
     assert gate["status"] == "passed"
+    assert manifest["status"] == "blocked"
+    gates = manifest["gates"]
+    assert isinstance(gates, list)
+    external = next(
+        item for item in gates if isinstance(item, dict) and item.get("id") == "independent_external_attestation"
+    )
+    assert isinstance(external, dict)
+    assert external["status"] == "blocked"
 
 
 def test_local_model_evidence_gate_rejects_tampered_binding(
@@ -167,6 +175,7 @@ def test_redaction_drops_nested_content_credentials_and_headers() -> None:
     sanitized = sanitize_evidence(
         {
             "prompt_bundle_hash": "a" * 64,
+            "app_runtime_binding_sha256": "b" * 64,
             "nested": {
                 "Api-Key": "must-not-escape",
                 "x_password": "must-not-escape",
@@ -189,6 +198,7 @@ def test_redaction_drops_nested_content_credentials_and_headers() -> None:
     assert "provider-request-private" not in serialized
     assert sanitized == {
         "prompt_bundle_hash": "a" * 64,
+        "app_runtime_binding_sha256": "b" * 64,
         "nested": {
             "provider_request_ids_sha256": ["5ca6ff8dd27a9ef0dfb6d76f0e410d74877d0b7eff5de22c411c94c4fc22f518"],
             "accepted": True,
@@ -221,6 +231,7 @@ def test_release_gate_is_blocked_without_real_infrastructure(tmp_path: Path) -> 
     assert isinstance(blocked, list)
     assert set(blocked) == {
         "licensed_corpus",
+        "independent_external_attestation",
         "local_model_artifacts",
         "cloud_gateway_credentials",
         "real_agent_traces",
@@ -316,7 +327,33 @@ def test_gpu_marker_never_silently_skips_release_gate() -> None:
     assert Path(evidence).is_file()
 
 
-def test_release_assets_document_real_gates_without_false_evidence() -> None:
-    manifest = json.loads((ROOT / "release" / "gate-manifest.json").read_text(encoding="utf-8"))
-    assert {item["id"] for item in manifest["gates"]} >= {"licensed_corpus", "canonical_app_image"}
+@pytest.mark.parametrize("script", ("check_release_gate.py", "run_public_analyze_sla_benchmark.py"))
+def test_installed_release_cli_help_needs_no_project_pythonpath(tmp_path: Path, script: str) -> None:
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+
+    completed = subprocess.run(
+        (sys.executable, str(ROOT / "scripts" / script), "--help"),
+        cwd=tmp_path,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_versioned_gate_ids_include_external_hard_block_without_false_evidence() -> None:
+    assert set(release_gates.release_gate_ids()) == {
+        "licensed_corpus",
+        "independent_external_attestation",
+        "local_model_artifacts",
+        "cloud_gateway_credentials",
+        "real_agent_traces",
+        "gpu_benchmark",
+        "grafana_browser_proof",
+        "websocket_gpu_p95",
+        "canonical_app_image",
+    }
     assert not (ROOT / "release-evidence").exists()

@@ -54,7 +54,7 @@ curl --fail --silent --show-error \
   "$MTBANK_RUNPOD_SPEECH_BASE_URL/v1/runtime"
 ```
 
-`/v1/runtime` returns configured device, CTranslate2 compute type, model identifiers, and the configured immutable image digest only. It returns no transcript, audio, artifact path, tag, token, or secret.
+`/v1/runtime` returns configured device, CTranslate2 compute type, model identifiers, and the configured declared image digest only. It returns no transcript, audio, artifact path, tag, token, or secret. The GPU runner must not call this split-plane endpoint directly: it uses the protected app-plane `/v1/benchmark-runtime-binding` endpoint on the same public authority as `/ws/transcribe`; the app fetches this response from its configured remote backend server-side. Neither a self-reported digest nor its hash proves external registry provenance or independent attestation.
 
 To enable provisional streaming, set `MTBANK_SPEECH__STREAMING__ENABLED=true` and inject `MTBANK_SPEECH__GROQ__API_KEY` through RunPod secrets. The API connects directly to `/v1/stream` as `wss`, sends exactly one RunPod bearer header, disables proxy/compression, and rejects handshake redirects; Groq is used only for bounded provisional updates while local ASR and Community-1 remain canonical batch reconciliation.
 

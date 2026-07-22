@@ -17,6 +17,7 @@ from mtbank_ai.api.error_handlers import install_error_handlers
 from mtbank_ai.api.readiness import CompositeReadiness, SpeechHttpReadiness
 from mtbank_ai.api.routes.analyze import router as analyze_router
 from mtbank_ai.api.routes.health import router as health_router
+from mtbank_ai.api.routes.runtime_binding import router as runtime_binding_router
 from mtbank_ai.api.routes.transcribe_ws import WebSocketSessionManager
 from mtbank_ai.api.routes.transcribe_ws import router as transcribe_ws_router
 from mtbank_ai.api.routes.trends import router as trends_router
@@ -148,6 +149,7 @@ def create_app(
     install_error_handlers(app)
     app.include_router(health_router)
     app.include_router(analyze_router)
+    app.include_router(runtime_binding_router)
     app.include_router(trends_router)
     app.include_router(transcribe_ws_router)
 

@@ -12,8 +12,10 @@ import os
 import time
 import wave
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
+from mtbank_ai.public_endpoint import PublicEndpointError, require_public_dns_host
 from mtbank_ai.runtime_secrets import SecretConfigurationError, require_environment_secret
 
 
@@ -35,11 +37,27 @@ def _percentile(values: list[float], percentile: float) -> float:
 
 def _validate_url(value: str) -> str:
     parsed = urlsplit(value)
-    if parsed.scheme not in {"ws", "wss"} or not parsed.netloc or parsed.path != "/ws/transcribe":
-        raise ValueError("--url должен быть абсолютным ws(s) URL exact `/ws/transcribe`")
-    if parsed.query or parsed.fragment:
-        raise ValueError("--url не должен содержать query или fragment")
+    if parsed.scheme != "wss" or not parsed.hostname or parsed.path != "/ws/transcribe":
+        raise ValueError("--url должен быть абсолютным WSS URL exact `/ws/transcribe`")
+    if parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment:
+        raise ValueError("--url не должен содержать credentials, query или fragment")
+    try:
+        require_public_dns_host(parsed.hostname, parsed.port or 443)
+    except PublicEndpointError as error:
+        raise ValueError(str(error)) from error
     return value
+
+
+def _connect_without_redirects(*args: Any, **kwargs: Any) -> Any:
+    """Не отправляет bearer header в redirect target после WebSocket handshake."""
+
+    from websockets.asyncio.client import connect
+
+    class NoRedirectConnect(connect):  # type: ignore[misc, valid-type]
+        def process_redirect(self, exc: Exception) -> Exception:
+            return exc
+
+    return NoRedirectConnect(*args, **kwargs)
 
 
 def _read_pcm16(path: Path) -> tuple[bytes, int]:
@@ -83,8 +101,6 @@ def _safe_update(payload: dict[str, object], latency_ms: float) -> dict[str, obj
 
 
 async def run(arguments: argparse.Namespace) -> dict[str, object]:
-    from websockets.asyncio.client import connect
-
     url = _validate_url(arguments.url)
     pcm, samples = _read_pcm16(arguments.audio)
     frame_bytes = arguments.frame_ms * 16_000 * 2 // 1000
@@ -94,15 +110,16 @@ async def run(arguments: argparse.Namespace) -> dict[str, object]:
         api_key = require_environment_secret(arguments.api_key_env, os.environ)
     except SecretConfigurationError as error:
         raise ValueError(str(error)) from error
-    headers = {"Authorization": f"Bearer {api_key}"}
+    headers = [("Authorization", f"Bearer {api_key}")]
     updates: list[dict[str, object]] = []
     session_started = time.monotonic()
     reconciliation_ms: float | None = None
     frame_count = 0
-    async with connect(
+    async with _connect_without_redirects(
         url,
         origin=arguments.origin,
         additional_headers=headers,
+        compression=None,
         max_size=arguments.max_message_bytes,
         proxy=None,
     ) as websocket:

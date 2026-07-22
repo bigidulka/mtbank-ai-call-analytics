@@ -15,8 +15,10 @@ from urllib.parse import urlsplit
 import httpx
 
 from mtbank_ai.domain.analysis import AnalyzeResponse
+from mtbank_ai.public_endpoint import PublicEndpointError, require_public_dns_host
 from mtbank_ai.runtime_secrets import SecretConfigurationError, require_environment_secret
-from scripts.run_local_speech_sla_benchmark import _duration_seconds, _make_five_minutes
+from mtbank_ai.speech.benchmark_workload import duration_seconds as _duration_seconds
+from mtbank_ai.speech.benchmark_workload import make_five_minutes as _make_five_minutes
 
 
 def _sha256(path: Path) -> str:
@@ -39,6 +41,10 @@ def _endpoint(value: str) -> str:
         or parts.path not in {"", "/"}
     ):
         raise ValueError("--base-url должен быть безопасным HTTPS origin")
+    try:
+        require_public_dns_host(parts.hostname, parts.port or 443)
+    except PublicEndpointError as error:
+        raise ValueError(str(error)) from error
     return f"{value.rstrip('/')}/analyze"
 
 

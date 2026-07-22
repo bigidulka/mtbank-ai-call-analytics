@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+import mtbank_ai.public_endpoint as public_endpoint
 import scripts.evaluate_canonical_speech as canonical_evaluator
 from mtbank_ai.speech.dataset import ManifestEntry
 from scripts.evaluate_canonical_speech import CanonicalEvaluationFailure, _endpoint, _evaluate_entry
@@ -53,6 +54,11 @@ def test_canonical_evaluator_bearer_mode_requires_safe_https_and_one_header(
 ) -> None:
     key = "N7!qR2@vL9#sX4$kM8%tY1^cD6&hJ3*F"
     monkeypatch.setenv("CANONICAL_TEST_KEY", key)
+    monkeypatch.setattr(
+        public_endpoint.socket,
+        "getaddrinfo",
+        lambda _host, port, **_kwargs: [(2, 1, 6, "", ("8.8.8.8", port))],
+    )
     headers = canonical_evaluator._bearer_headers("CANONICAL_TEST_KEY")
     assert headers == {"Authorization": f"Bearer {key}"}
     assert canonical_evaluator._endpoint("https://speech.test", bearer=True) == "https://speech.test/v1/transcribe"

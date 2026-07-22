@@ -7,7 +7,6 @@ import argparse
 import hashlib
 import json
 import os
-import subprocess
 import tempfile
 import time
 from pathlib import Path
@@ -15,11 +14,11 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from mtbank_ai.public_endpoint import PublicEndpointError, require_public_dns_host
 from mtbank_ai.runtime_secrets import SecretConfigurationError, require_environment_secret
+from mtbank_ai.speech.benchmark_workload import BenchmarkWorkloadError, duration_seconds, make_five_minutes
 
-
-class BenchmarkFailure(RuntimeError):
-    pass
+BenchmarkFailure = BenchmarkWorkloadError
 
 
 def _endpoint(base_url: str, *, bearer: bool = False) -> str:
@@ -36,6 +35,11 @@ def _endpoint(base_url: str, *, bearer: bool = False) -> str:
         raise ValueError("--base-url должен быть безопасным абсолютным HTTP(S) origin")
     if bearer and parsed.scheme != "https":
         raise ValueError("bearer --base-url должен использовать HTTPS")
+    if bearer:
+        try:
+            require_public_dns_host(parsed.hostname or "", parsed.port or 443)
+        except PublicEndpointError as error:
+            raise ValueError(str(error)) from error
     return f"{base_url.rstrip('/')}/v1/transcribe"
 
 
@@ -57,60 +61,14 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _make_five_minutes(source: Path, destination: Path) -> None:
-    command = (
-        "ffmpeg",
-        "-nostdin",
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-stream_loop",
-        "-1",
-        "-i",
-        str(source),
-        "-t",
-        "300",
-        "-map",
-        "0:a:0",
-        "-ac",
-        "1",
-        "-ar",
-        "16000",
-        "-c:a",
-        "pcm_s16le",
-        "-y",
-        str(destination),
-    )
-    try:
-        subprocess.run(command, check=True, capture_output=True, timeout=60)
-    except (OSError, subprocess.SubprocessError) as error:
-        raise BenchmarkFailure("не удалось создать five-minute synthetic workload") from error
-
-
-def _duration_seconds(path: Path) -> float:
-    command = (
-        "ffprobe",
-        "-v",
-        "error",
-        "-show_entries",
-        "format=duration",
-        "-of",
-        "default=noprint_wrappers=1:nokey=1",
-        str(path),
-    )
-    try:
-        completed = subprocess.run(command, check=True, capture_output=True, text=True, timeout=10)
-        duration = float(completed.stdout.strip())
-    except (OSError, ValueError, subprocess.SubprocessError) as error:
-        raise BenchmarkFailure("не удалось определить duration workload") from error
-    if not 299.9 <= duration <= 300.1:
-        raise BenchmarkFailure("workload должен быть ровно 300 секунд")
-    return duration
+_make_five_minutes = make_five_minutes
+_duration_seconds = duration_seconds
 
 
 def benchmark(arguments: argparse.Namespace) -> tuple[int, dict[str, object]]:
-    headers = _bearer_headers(getattr(arguments, "api_key_env", None))
-    endpoint = _endpoint(arguments.base_url, bearer=headers is not None)
+    api_key_env = getattr(arguments, "api_key_env", None)
+    endpoint = _endpoint(arguments.base_url, bearer=api_key_env is not None)
+    headers = _bearer_headers(api_key_env)
     with tempfile.TemporaryDirectory(prefix="mtbank-five-minute-") as directory:
         workload = Path(directory) / "five-minutes.wav"
         _make_five_minutes(arguments.audio, workload)

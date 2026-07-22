@@ -35,6 +35,7 @@ else:
         speaker_attributed_wer,
         time_weighted_role_accuracy,
     )
+from mtbank_ai.public_endpoint import PublicEndpointError, require_public_dns_host
 from mtbank_ai.runtime_secrets import SecretConfigurationError, require_environment_secret
 from mtbank_ai.speech.contracts import SpeechTranscriptionResponse
 from mtbank_ai.speech.dataset import ManifestEntry, validate_manifest
@@ -72,6 +73,11 @@ def _endpoint(base_url: str, *, bearer: bool = False) -> str:
         raise ValueError("bearer canonical base URL должен использовать HTTPS")
     if parsed.path not in {"", "/"}:
         raise ValueError("canonical base URL не должен содержать path")
+    if bearer:
+        try:
+            require_public_dns_host(parsed.hostname or "", parsed.port or 443)
+        except PublicEndpointError as error:
+            raise ValueError(str(error)) from error
     return f"{base_url.rstrip('/')}/v1/transcribe"
 
 
@@ -224,8 +230,9 @@ def _evaluate_entry(
 
 def evaluate(arguments: argparse.Namespace) -> tuple[int, dict[str, object]]:
     entries = validate_manifest(arguments.manifest, require_release_corpus=True)
-    headers = _bearer_headers(getattr(arguments, "api_key_env", None))
-    endpoint = _endpoint(arguments.base_url, bearer=headers is not None)
+    api_key_env = getattr(arguments, "api_key_env", None)
+    endpoint = _endpoint(arguments.base_url, bearer=api_key_env is not None)
+    headers = _bearer_headers(api_key_env)
     scored_entries = tuple(entry for entry in entries if entry.kind == "speech_reference")
     results: list[dict[str, object]] = []
     with httpx.Client(timeout=arguments.timeout_seconds, follow_redirects=False, trust_env=False) as client:

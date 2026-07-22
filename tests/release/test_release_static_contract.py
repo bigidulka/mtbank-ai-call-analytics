@@ -30,7 +30,9 @@ def test_ci_has_offline_real_and_gpu_release_jobs() -> None:
     assert "workflow_dispatch:" in gpu
     assert "self-hosted" in gpu
     assert "run_gpu_speech_benchmark.py" in gpu
-    assert "MTBANK_GPU_BENCHMARK_RUNTIME_URL" in gpu
+    assert "MTBANK_GPU_BENCHMARK_RUNTIME_URL" not in gpu
+    binding_route = ROOT / "src" / "mtbank_ai" / "api" / "routes" / "runtime_binding.py"
+    assert "benchmark-runtime-binding" in binding_route.read_text(encoding="utf-8")
     assert "MTBANK_GPU_BENCHMARK_IMAGE_DIGEST" in gpu
     assert "docker image inspect" not in gpu
     assert "Validate generated GPU evidence for this checkout" in gpu
