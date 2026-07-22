@@ -295,7 +295,9 @@ def test_bearer_access_protects_remote_speech_boundary_and_keeps_live_anonymous(
     async def scenario() -> None:
         key = "X2v9Qa7Lm4Rc8Nd6Hs3Kp5Zw1By0TeUf"
         settings = SpeechSettings(
-            runtime=SpeechRuntimeSettings(temp_root=str(tmp_path / "work")),
+            runtime=SpeechRuntimeSettings(
+                temp_root=str(tmp_path / "work"), image_digest="sha256:" + "a" * 64
+            ),
             access=SpeechAccessSettings(mode="bearer", bearer_key=SecretStr(key)),
         )
         app = create_app(settings=settings, runtime=StubRuntime())
@@ -329,6 +331,7 @@ def test_bearer_access_protects_remote_speech_boundary_and_keeps_live_anonymous(
             "runtime": {
                 "device": "cpu",
                 "compute_type": "int8",
+                "image_digest": "sha256:" + "a" * 64,
                 "asr": {
                     "package": expected_asr.package,
                     "package_version": expected_asr.package_version,
@@ -345,6 +348,12 @@ def test_bearer_access_protects_remote_speech_boundary_and_keeps_live_anonymous(
         }
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("image_digest", ("latest", "sha256:" + "A" * 64, "sha256:" + "a" * 63))
+def test_runtime_image_digest_requires_immutable_lowercase_sha256(image_digest: str) -> None:
+    with pytest.raises(ValidationError, match="image_digest"):
+        SpeechRuntimeSettings(image_digest=image_digest)
 
 
 def test_bearer_access_rejects_non_ascii_configured_key_before_auth_matching() -> None:

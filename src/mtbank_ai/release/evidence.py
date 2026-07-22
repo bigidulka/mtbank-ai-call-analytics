@@ -49,8 +49,17 @@ _EVIDENCE_SCHEMAS: Final = {
         frozenset({"dataset_id"}),
     ),
     "local-model-artifacts": (
-        frozenset({"artifact_set_sha256", "manifest_source_sha256", "model_revision", "reviewer_id_sha256"}),
-        frozenset({"artifact_count"}),
+        frozenset(
+            {
+                "manifest_sha256",
+                "asr_artifact_sha256",
+                "diarization_artifact_sha256",
+                "asr_model_revision",
+                "diarization_model_revision",
+                "reviewer_id_sha256",
+            }
+        ),
+        frozenset({"artifact_count", "asr_file_count", "diarization_file_count"}),
         frozenset({"model_set_id"}),
     ),
     "real-agent-traces": (
@@ -59,7 +68,15 @@ _EVIDENCE_SCHEMAS: Final = {
         frozenset({"agent_ids", "provider_request_ids_sha256"}),
     ),
     "gpu-benchmark": (
-        frozenset({"image_digest", "model_manifest_sha256", "runner_id_sha256", "workload_revision"}),
+        frozenset(
+            {
+                "image_digest",
+                "model_manifest_sha256",
+                "runner_id_sha256",
+                "runtime_attestation_sha256",
+                "workload_revision",
+            }
+        ),
         frozenset({"p50_ms", "p95_ms", "throughput_per_second"}),
         frozenset(),
     ),
@@ -69,7 +86,15 @@ _EVIDENCE_SCHEMAS: Final = {
         frozenset(),
     ),
     "websocket-gpu-p95": (
-        frozenset({"image_digest", "model_manifest_sha256", "runner_id_sha256", "workload_revision"}),
+        frozenset(
+            {
+                "image_digest",
+                "model_manifest_sha256",
+                "runner_id_sha256",
+                "runtime_attestation_sha256",
+                "workload_revision",
+            }
+        ),
         frozenset({"p95_ms", "session_count"}),
         frozenset(),
     ),

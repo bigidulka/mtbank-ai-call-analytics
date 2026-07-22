@@ -10,7 +10,16 @@ from dataclasses import dataclass
 from typing import Any, Literal, Protocol, TypeAlias, cast
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
-from mtbank_ai.config import _is_internal_direct_ip, _is_internal_service_name, _validate_speech_service_path
+from pydantic import SecretStr
+
+from mtbank_ai.config import (
+    _is_internal_direct_ip,
+    _is_internal_service_name,
+    _is_non_public_direct_ip,
+    _is_non_public_speech_dns_name,
+    _validate_speech_service_path,
+)
+from mtbank_ai.runtime_secrets import SecretConfigurationError, require_runtime_secret
 
 StreamingCodec: TypeAlias = Literal["pcm_s16le", "ogg_opus"]
 
@@ -130,6 +139,71 @@ class InternalSpeechWebSocketSettings:
         return urlunsplit(("ws", parts.netloc, f"{base_path}{stream_path}", "", ""))
 
 
+@dataclass(frozen=True, slots=True)
+class RemoteSpeechWebSocketSettings:
+    """Direct authenticated WSS transport for the configured RunPod speech service."""
+
+    base_url: str
+    stream_path: str
+    api_key: SecretStr
+    open_timeout_seconds: float
+    ping_interval_seconds: float
+    ping_timeout_seconds: float
+    close_timeout_seconds: float
+    max_message_bytes: int
+    max_queue: int = 1
+    max_updates_per_operation: int = 4
+
+    def __post_init__(self) -> None:
+        if (
+            self.open_timeout_seconds <= 0
+            or self.ping_interval_seconds <= 0
+            or self.ping_timeout_seconds <= 0
+            or self.close_timeout_seconds <= 0
+            or self.max_message_bytes <= 0
+            or self.max_queue <= 0
+            or self.max_updates_per_operation <= 0
+        ):
+            raise ValueError("remote streaming WebSocket limits must be positive")
+        _trusted_remote_base_url(self.base_url)
+        _validate_speech_service_path(self.stream_path)
+        api_key = self.api_key.get_secret_value()
+        if not api_key.isascii():
+            raise ValueError("remote streaming bearer key must be ASCII")
+        try:
+            require_runtime_secret("MTBANK_SPEECH__API_KEY", api_key)
+        except SecretConfigurationError as error:
+            raise ValueError("remote streaming bearer key is unsafe") from error
+
+    @property
+    def url(self) -> str:
+        parts = _trusted_remote_base_url(self.base_url)
+        stream_path = _validate_speech_service_path(self.stream_path)
+        return urlunsplit(("wss", parts.netloc, f"{parts.path.rstrip('/')}{stream_path}", "", ""))
+
+
+def _trusted_remote_base_url(value: str) -> SplitResult:
+    try:
+        parts = urlsplit(value)
+        parts.port
+    except ValueError:
+        raise ValueError("remote streaming base URL is invalid") from None
+    if (
+        parts.scheme != "https"
+        or not parts.hostname
+        or parts.username is not None
+        or parts.password is not None
+        or parts.query
+        or parts.fragment
+        or _is_non_public_speech_dns_name(parts.hostname)
+        or _is_non_public_direct_ip(parts.hostname)
+    ):
+        raise ValueError("remote streaming requires a public HTTPS base URL")
+    if parts.path:
+        _validate_speech_service_path(parts.path)
+    return parts
+
+
 def _trusted_internal_base_url(value: str) -> SplitResult:
     try:
         parts = urlsplit(value)
@@ -199,12 +273,60 @@ class InternalSpeechWebSocketAdapter:
             raise StreamingAdapterUnavailable("internal streaming service is unavailable") from error
 
 
+class RemoteSpeechWebSocketAdapter:
+    """No-proxy, no-compression WSS client with one RunPod bearer header."""
+
+    def __init__(
+        self,
+        settings: RemoteSpeechWebSocketSettings,
+        *,
+        connector: WebSocketConnector | None = None,
+    ) -> None:
+        self._settings = settings
+        self._connector = connector or _remote_websockets_connector
+
+    async def open(self, start: StreamingStart) -> StreamingSpeechSession:
+        connection: AbstractAsyncContextManager[_WebSocketConnection] | None = None
+        websocket: _WebSocketConnection | None = None
+        try:
+            connection = self._connector(
+                self._settings.url,
+                compression=None,
+                proxy=None,
+                additional_headers=[("Authorization", f"Bearer {self._settings.api_key.get_secret_value()}")],
+                open_timeout=self._settings.open_timeout_seconds,
+                ping_interval=self._settings.ping_interval_seconds,
+                ping_timeout=self._settings.ping_timeout_seconds,
+                close_timeout=self._settings.close_timeout_seconds,
+                max_size=self._settings.max_message_bytes,
+                max_queue=self._settings.max_queue,
+                write_limit=self._settings.max_message_bytes,
+            )
+            websocket = await connection.__aenter__()
+            await _within_timeout(
+                websocket.send(_json_message(_start_payload(start))), self._settings.open_timeout_seconds
+            )
+            started = _json_object(await _within_timeout(websocket.recv(), self._settings.open_timeout_seconds))
+            if started != {"type": "started", "sequence": 0}:
+                raise StreamingAdapterUnavailable("remote streaming service rejected start")
+            return _InternalSpeechWebSocketSession(websocket, connection, self._settings)
+        except asyncio.CancelledError:
+            await _abort_open_connection(websocket, connection, self._settings.close_timeout_seconds)
+            raise
+        except StreamingAdapterUnavailable:
+            await _abort_open_connection(websocket, connection, self._settings.close_timeout_seconds)
+            raise
+        except Exception as error:
+            await _abort_open_connection(websocket, connection, self._settings.close_timeout_seconds)
+            raise StreamingAdapterUnavailable("remote streaming service is unavailable") from error
+
+
 class _InternalSpeechWebSocketSession:
     def __init__(
         self,
         websocket: _WebSocketConnection,
         connection: AbstractAsyncContextManager[_WebSocketConnection],
-        settings: InternalSpeechWebSocketSettings,
+        settings: InternalSpeechWebSocketSettings | RemoteSpeechWebSocketSettings,
     ) -> None:
         self._websocket = websocket
         self._connection = connection
@@ -422,3 +544,18 @@ def _websockets_connector(*args: Any, **kwargs: Any) -> AbstractAsyncContextMana
     except ImportError as error:
         raise StreamingAdapterUnavailable("websockets dependency is unavailable") from error
     return connect(*args, **kwargs)
+
+
+def _remote_websockets_connector(*args: Any, **kwargs: Any) -> AbstractAsyncContextManager[_WebSocketConnection]:
+    """Uses websockets 16 transport but turns every handshake redirect into a failure."""
+
+    try:
+        from websockets.asyncio.client import connect  # pyright: ignore[reportMissingImports]
+    except ImportError as error:
+        raise StreamingAdapterUnavailable("websockets dependency is unavailable") from error
+
+    class _NoRedirectConnect(connect):  # type: ignore[misc, valid-type]
+        def process_redirect(self, exc: Exception) -> Exception:
+            return exc
+
+    return _NoRedirectConnect(*args, **kwargs)

@@ -4,7 +4,7 @@
 
 Canonical batch speech processing is local `faster-whisper` `large-v3-turbo` plus local offline `pyannote/speaker-diarization-community-1`. Runtime verifies both local artifacts from `models/manifest.json` and never downloads models.
 
-Default Compose keeps streaming disabled and does not require `GROQ_API_KEY`. The opt-in WebSocket provisional mode additionally requires Groq credentials; set one explicit browser origin and apply the overlay:
+Default Compose keeps streaming disabled and does not require `GROQ_API_KEY`. The opt-in WebSocket provisional mode additionally requires Groq credentials; its remote RunPod transport uses direct `wss`, exactly one bearer header, no proxy/compression, and rejects handshake redirects. Groq produces bounded provisional updates only; local ASR and Community-1 remain canonical reconciliation. Set one explicit browser origin and apply the overlay:
 
 ```bash
 MTBANK_WEBSOCKET_ALLOWED_ORIGIN=https://approved.example \

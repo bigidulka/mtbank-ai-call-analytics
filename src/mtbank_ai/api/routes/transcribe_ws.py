@@ -149,6 +149,7 @@ async def transcribe_ws(websocket: WebSocket) -> None:
                     max_update_text_bytes=ws_settings.max_update_text_bytes,
                     update_latency_seconds=max(0.0, time.monotonic() - update_started),
                 )
+                await _send_json(websocket, {"type": "ack", "sequence": sequence}, deadline)
     except TimeoutError:
         await _send_timeout(websocket)
     except WebSocketDisconnect:

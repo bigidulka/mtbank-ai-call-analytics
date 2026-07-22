@@ -6,12 +6,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import socket
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from mtbank_ai.release.evidence import export_evidence, sha256_text, validate_evidence
+import httpx
+
+from mtbank_ai.release.evidence import export_evidence, sha256, sha256_text, validate_evidence
+from mtbank_ai.runtime_secrets import SecretConfigurationError, require_environment_secret
 
 ROOT = Path(__file__).parents[1]
 
@@ -45,6 +50,41 @@ def _image_digest(value: str) -> str:
     if not value.startswith("sha256:") or len(value) != 71 or any(char not in "0123456789abcdef" for char in value[7:]):
         raise ValueError("--image-digest должен быть фактическим sha256 image digest")
     return value
+
+
+def _runtime_attestation(url: str, api_key_env: str, expected_digest: str) -> str:
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or parsed.path != "/v1/runtime"
+    ):
+        raise ValueError("--runtime-url должен быть безопасным HTTPS URL exact /v1/runtime")
+    try:
+        api_key = require_environment_secret(api_key_env, os.environ)
+    except SecretConfigurationError as error:
+        raise ValueError(str(error)) from error
+    try:
+        with httpx.Client(timeout=15.0, follow_redirects=False, trust_env=False) as client:
+            response = client.get(url, headers={"Authorization": f"Bearer {api_key}"})
+        response.raise_for_status()
+        payload = response.json()
+    except (httpx.HTTPError, ValueError) as error:
+        raise ValueError("remote runtime attestation is unavailable or invalid") from error
+    if not isinstance(payload, dict) or set(payload) != {"runtime"} or not isinstance(payload["runtime"], dict):
+        raise ValueError("remote runtime attestation has invalid schema")
+    runtime = payload["runtime"]
+    if runtime.get("image_digest") != expected_digest:
+        raise ValueError("remote runtime attestation image digest does not match --image-digest")
+    for component in ("asr", "diarization"):
+        value = runtime.get(component)
+        if not isinstance(value, dict) or set(value) != {"package", "package_version", "model_id", "model_revision"}:
+            raise ValueError("remote runtime attestation component schema is invalid")
+    return sha256(payload)
 
 
 def _required_number(payload: dict[str, object], key: str) -> float:
@@ -98,6 +138,7 @@ def main() -> int:
     parser.add_argument("--api-key-env", default="MTBANK_API_KEY")
     parser.add_argument("--frame-ms", type=int, default=500)
     parser.add_argument("--image-digest", required=True)
+    parser.add_argument("--runtime-url", required=True)
     parser.add_argument("--model-manifest", type=Path, default=Path("models/manifest.json"))
     parser.add_argument("--workload-revision", required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -109,6 +150,7 @@ def main() -> int:
 
     nvidia = _nvidia_observation()
     image_digest = _image_digest(arguments.image_digest)
+    runtime_attestation_sha256 = _runtime_attestation(arguments.runtime_url, arguments.api_key_env, image_digest)
     code_sha = _code_sha()
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
     diagnostic_path = arguments.output_dir / "websocket-diagnostic.json"
@@ -121,6 +163,7 @@ def main() -> int:
         "image_digest": image_digest,
         "model_manifest_sha256": _sha256(arguments.model_manifest),
         "runner_id_sha256": sha256_text(socket.gethostname() + "\n" + nvidia),
+        "runtime_attestation_sha256": runtime_attestation_sha256,
         "workload_revision": arguments.workload_revision,
     }
     gpu_evidence = export_evidence(

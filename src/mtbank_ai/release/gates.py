@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mtbank_ai.release.evidence import EvidenceValidationError, validate_evidence
+from services.speech.manifest import ModelRegistry, SpeechModelManifest
 
 _REQUIRED_CLOUD_VARIABLES = (
     "MTBANK_AGENT_RUNTIME__GATEWAY__BASE_URL",
@@ -95,15 +96,56 @@ def _licensed_corpus(context: ReleaseGateContext, current_code_sha: str | None) 
 
 
 def _model_artifacts(context: ReleaseGateContext, current_code_sha: str | None) -> GateResult:
-    manifest = context.root / "models" / "manifest.json"
+    manifest_path = context.root / "models" / "manifest.json"
     artifacts = context.root / "models" / "artifacts"
-    if not artifacts.is_dir() or not any(artifacts.iterdir()):
+    evidence_path = context.root / "release-evidence" / "local-model-artifacts.json"
+    try:
+        manifest = SpeechModelManifest.model_validate(json.loads(manifest_path.read_text(encoding="utf-8")))
+        registry = ModelRegistry(artifact_root=artifacts, manifest=manifest)
+        if not registry.verify_ready():
+            raise ValueError("artifact tree hash mismatch")
+    except (OSError, ValueError):
         return GateResult(
             "local_model_artifacts",
             "blocked",
-            "локальные immutable model artifacts не предоставлены.",
+            "runtime manifest schema v3 или immutable ASR/diarization artifacts не прошли validation.",
         )
-    return _typed_evidence_file(context, "local_model_artifacts", manifest, "local-model-artifacts", current_code_sha)
+    if current_code_sha is None:
+        return GateResult("local_model_artifacts", "blocked", "не удалось определить текущий Git code SHA.")
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        validate_evidence(evidence, expected_kind="local-model-artifacts", expected_code_sha=current_code_sha)
+        provenance = evidence["provenance"]
+        metrics = evidence["metrics"]
+        assert isinstance(provenance, Mapping) and isinstance(metrics, Mapping)
+        expected = {
+            "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+            "asr_artifact_sha256": manifest.asr.artifact_sha256,
+            "diarization_artifact_sha256": manifest.diarization.artifact_sha256,
+            "asr_model_revision": manifest.asr.model_revision,
+            "diarization_model_revision": manifest.diarization.model_revision,
+        }
+        if any(provenance.get(key) != value for key, value in expected.items()):
+            raise EvidenceValidationError("model provenance binding mismatch")
+        asr_file_count = _artifact_file_count(registry.artifact_path(manifest.asr))
+        diarization_file_count = _artifact_file_count(registry.artifact_path(manifest.diarization))
+        if (
+            metrics.get("asr_file_count") != asr_file_count
+            or metrics.get("diarization_file_count") != diarization_file_count
+            or metrics.get("artifact_count") != 2
+        ):
+            raise EvidenceValidationError("model artifact count binding mismatch")
+    except (OSError, json.JSONDecodeError, EvidenceValidationError, AssertionError):
+        return GateResult(
+            "local_model_artifacts",
+            "blocked",
+            "local-model-artifacts.json не прошло typed runtime manifest/artifact binding validation.",
+        )
+    return _passed_file("local_model_artifacts", evidence_path)
+
+
+def _artifact_file_count(path: Path) -> int:
+    return sum(1 for item in path.rglob("*") if item.is_file() and not item.is_symlink())
 
 
 def _cloud_credentials(context: ReleaseGateContext) -> GateResult:

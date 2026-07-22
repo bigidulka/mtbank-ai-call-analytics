@@ -14,6 +14,8 @@ jobs:
       MTBANK_GPU_BENCHMARK_EVIDENCE: release-evidence/gpu-benchmark.json
       MTBANK_API_KEY: ${{ secrets.MTBANK_GPU_BENCHMARK_API_KEY }}
       MTBANK_GPU_BENCHMARK_WEBSOCKET_URL: ${{ vars.MTBANK_GPU_BENCHMARK_WEBSOCKET_URL }}
+      MTBANK_GPU_BENCHMARK_RUNTIME_URL: ${{ vars.MTBANK_GPU_BENCHMARK_RUNTIME_URL }}
+      MTBANK_GPU_BENCHMARK_IMAGE_DIGEST: ${{ vars.MTBANK_GPU_BENCHMARK_IMAGE_DIGEST }}
       MTBANK_GPU_BENCHMARK_ORIGIN: ${{ vars.MTBANK_GPU_BENCHMARK_ORIGIN }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -26,17 +28,17 @@ jobs:
         run: |
           test -n "$MTBANK_API_KEY"
           test -n "$MTBANK_GPU_BENCHMARK_WEBSOCKET_URL"
+          test -n "$MTBANK_GPU_BENCHMARK_RUNTIME_URL"
+          test -n "$MTBANK_GPU_BENCHMARK_IMAGE_DIGEST"
           test -n "$MTBANK_GPU_BENCHMARK_ORIGIN"
-      - name: Build GPU speech image from this checkout
-        run: docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile gpu build speech
-      - name: Run observed NVIDIA WebSocket workload
+      - name: Run observed deployed NVIDIA WebSocket workload
         run: |
-          image_digest="$(docker image inspect --format '{{.Id}}' mtbank-ai-speech-gpu:local)"
           uv run python scripts/run_gpu_speech_benchmark.py \
             --websocket-url "$MTBANK_GPU_BENCHMARK_WEBSOCKET_URL" \
+            --runtime-url "$MTBANK_GPU_BENCHMARK_RUNTIME_URL" \
             --origin "$MTBANK_GPU_BENCHMARK_ORIGIN" \
             --audio test_data/synthetic/credit-consultation-16k.wav \
-            --image-digest "$image_digest" \
+            --image-digest "$MTBANK_GPU_BENCHMARK_IMAGE_DIGEST" \
             --workload-revision websocket-pcm16-v1 \
             --output-dir release-evidence
       - name: Validate generated GPU evidence for this checkout

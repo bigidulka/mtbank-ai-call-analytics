@@ -30,8 +30,9 @@ def test_ci_has_offline_real_and_gpu_release_jobs() -> None:
     assert "workflow_dispatch:" in gpu
     assert "self-hosted" in gpu
     assert "run_gpu_speech_benchmark.py" in gpu
-    assert "docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile gpu build speech" in gpu
-    assert "docker image inspect" in gpu
+    assert "MTBANK_GPU_BENCHMARK_RUNTIME_URL" in gpu
+    assert "MTBANK_GPU_BENCHMARK_IMAGE_DIGEST" in gpu
+    assert "docker image inspect" not in gpu
     assert "Validate generated GPU evidence for this checkout" in gpu
     assert "websocket-gpu-p95.json" in gpu
     assert "pytest -m gpu" in gpu

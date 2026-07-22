@@ -5,10 +5,13 @@ import json
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
 
 from mtbank_ai.speech.streaming import (
     InternalSpeechWebSocketAdapter,
     InternalSpeechWebSocketSettings,
+    RemoteSpeechWebSocketAdapter,
+    RemoteSpeechWebSocketSettings,
     StreamingAdapterUnavailable,
     StreamingProtocolError,
     StreamingStart,
@@ -189,6 +192,42 @@ def test_internal_adapter_disables_proxy_and_closes_after_terminal_message() -> 
         assert final_updates == (StreamingUpdate(sequence=1, text="итоговый текст", final=True),)
         assert websocket.closed
         assert connection.exited
+
+    asyncio.run(scenario())
+
+
+def test_remote_adapter_uses_wss_one_bearer_header_and_no_proxy_or_compression() -> None:
+    async def scenario() -> None:
+        websocket = _FakeWebSocket([json.dumps({"type": "started", "sequence": 0})])
+        connection = _FakeConnection(websocket)
+        captured: dict[str, Any] = {}
+
+        def connector(*args: object, **kwargs: object) -> _FakeConnection:
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            return connection
+
+        settings = RemoteSpeechWebSocketSettings(
+            base_url="https://speech.example.test/api",
+            stream_path="/v1/stream",
+            api_key=SecretStr("N7!qR2@vL9#sX4$kM8%tY1^cD6&hJ3*F"),
+            open_timeout_seconds=1.0,
+            ping_interval_seconds=1.0,
+            ping_timeout_seconds=1.0,
+            close_timeout_seconds=1.0,
+            max_message_bytes=65_540,
+        )
+        session = await RemoteSpeechWebSocketAdapter(settings, connector=connector).open(
+            StreamingStart("pcm_s16le", 16_000, 1)
+        )
+        await session.close()
+
+        assert captured["args"] == ("wss://speech.example.test/api/v1/stream",)
+        assert captured["kwargs"]["additional_headers"] == [
+            ("Authorization", "Bearer N7!qR2@vL9#sX4$kM8%tY1^cD6&hJ3*F")
+        ]
+        assert captured["kwargs"]["compression"] is None
+        assert captured["kwargs"]["proxy"] is None
 
     asyncio.run(scenario())
 

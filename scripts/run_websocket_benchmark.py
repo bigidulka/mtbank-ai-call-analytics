@@ -14,6 +14,8 @@ import wave
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from mtbank_ai.runtime_secrets import SecretConfigurationError, require_environment_secret
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -88,9 +90,10 @@ async def run(arguments: argparse.Namespace) -> dict[str, object]:
     frame_bytes = arguments.frame_ms * 16_000 * 2 // 1000
     if frame_bytes <= 0 or arguments.frame_ms * 16_000 * 2 % 1000:
         raise ValueError("--frame-ms должен задавать целое число PCM samples")
-    api_key = os.environ.get(arguments.api_key_env, "")
-    if not api_key:
-        raise ValueError(f"не задана переменная окружения {arguments.api_key_env}")
+    try:
+        api_key = require_environment_secret(arguments.api_key_env, os.environ)
+    except SecretConfigurationError as error:
+        raise ValueError(str(error)) from error
     headers = {"Authorization": f"Bearer {api_key}"}
     updates: list[dict[str, object]] = []
     session_started = time.monotonic()

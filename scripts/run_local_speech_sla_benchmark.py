@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import tempfile
 import time
@@ -14,16 +15,38 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from mtbank_ai.runtime_secrets import SecretConfigurationError, require_environment_secret
+
 
 class BenchmarkFailure(RuntimeError):
     pass
 
 
-def _endpoint(base_url: str) -> str:
+def _endpoint(base_url: str, *, bearer: bool = False) -> str:
     parsed = urlsplit(base_url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.path not in {"", "/"}:
-        raise ValueError("--base-url должен быть абсолютным HTTP(S) origin")
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+    ):
+        raise ValueError("--base-url должен быть безопасным абсолютным HTTP(S) origin")
+    if bearer and parsed.scheme != "https":
+        raise ValueError("bearer --base-url должен использовать HTTPS")
     return f"{base_url.rstrip('/')}/v1/transcribe"
+
+
+def _bearer_headers(api_key_env: str | None) -> dict[str, str] | None:
+    if api_key_env is None:
+        return None
+    try:
+        api_key = require_environment_secret(api_key_env, os.environ)
+    except SecretConfigurationError as error:
+        raise ValueError(str(error)) from error
+    return {"Authorization": f"Bearer {api_key}"}
 
 
 def _sha256(path: Path) -> str:
@@ -86,7 +109,8 @@ def _duration_seconds(path: Path) -> float:
 
 
 def benchmark(arguments: argparse.Namespace) -> tuple[int, dict[str, object]]:
-    endpoint = _endpoint(arguments.base_url)
+    headers = _bearer_headers(getattr(arguments, "api_key_env", None))
+    endpoint = _endpoint(arguments.base_url, bearer=headers is not None)
     with tempfile.TemporaryDirectory(prefix="mtbank-five-minute-") as directory:
         workload = Path(directory) / "five-minutes.wav"
         _make_five_minutes(arguments.audio, workload)
@@ -97,7 +121,7 @@ def benchmark(arguments: argparse.Namespace) -> tuple[int, dict[str, object]]:
             follow_redirects=False,
             trust_env=False,
         ) as client:
-            response = client.post(endpoint, files={"file": (workload.name, audio, "audio/wav")})
+            response = client.post(endpoint, files={"file": (workload.name, audio, "audio/wav")}, headers=headers)
         elapsed = time.monotonic() - started
         result = {
             "schema_version": 1,
@@ -117,6 +141,7 @@ def benchmark(arguments: argparse.Namespace) -> tuple[int, dict[str, object]]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", required=True)
+    parser.add_argument("--api-key-env", help="имя переменной окружения bearer key для remote HTTPS")
     parser.add_argument("--audio", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=float, default=600.0)

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -34,6 +35,7 @@ else:
         speaker_attributed_wer,
         time_weighted_role_accuracy,
     )
+from mtbank_ai.runtime_secrets import SecretConfigurationError, require_environment_secret
 from mtbank_ai.speech.contracts import SpeechTranscriptionResponse
 from mtbank_ai.speech.dataset import ManifestEntry, validate_manifest
 
@@ -55,13 +57,32 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _endpoint(base_url: str) -> str:
+def _endpoint(base_url: str, *, bearer: bool = False) -> str:
     parsed = urlsplit(base_url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.query or parsed.fragment:
-        raise ValueError("canonical base URL должен быть абсолютным HTTP(S) URL без query/fragment")
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("canonical base URL должен быть абсолютным HTTP(S) URL без credentials/query/fragment")
+    if bearer and parsed.scheme != "https":
+        raise ValueError("bearer canonical base URL должен использовать HTTPS")
     if parsed.path not in {"", "/"}:
         raise ValueError("canonical base URL не должен содержать path")
     return f"{base_url.rstrip('/')}/v1/transcribe"
+
+
+def _bearer_headers(api_key_env: str | None) -> dict[str, str] | None:
+    if api_key_env is None:
+        return None
+    try:
+        api_key = require_environment_secret(api_key_env, os.environ)
+    except SecretConfigurationError as error:
+        raise ValueError(str(error)) from error
+    return {"Authorization": f"Bearer {api_key}"}
 
 
 def _segments(response: SpeechTranscriptionResponse) -> tuple[Segment, ...]:
@@ -154,13 +175,16 @@ def _counts_from_json(value: dict[str, object]) -> ErrorCounts:
     )
 
 
-def _evaluate_entry(client: httpx.Client, endpoint: str, entry: ManifestEntry) -> dict[str, object]:
+def _evaluate_entry(
+    client: httpx.Client, endpoint: str, entry: ManifestEntry, headers: dict[str, str] | None = None
+) -> dict[str, object]:
     content_type = _CONTENT_TYPES[entry.raw["format"]]
     started = time.monotonic()
     with entry.path.open("rb") as audio:
         response = client.post(
             endpoint,
             files={"file": (entry.path.name, audio, content_type)},
+            headers=headers,
         )
     latency_ms = round((time.monotonic() - started) * 1000, 3)
     if response.status_code == 502:
@@ -200,13 +224,14 @@ def _evaluate_entry(client: httpx.Client, endpoint: str, entry: ManifestEntry) -
 
 def evaluate(arguments: argparse.Namespace) -> tuple[int, dict[str, object]]:
     entries = validate_manifest(arguments.manifest, require_release_corpus=True)
-    endpoint = _endpoint(arguments.base_url)
+    headers = _bearer_headers(getattr(arguments, "api_key_env", None))
+    endpoint = _endpoint(arguments.base_url, bearer=headers is not None)
     scored_entries = tuple(entry for entry in entries if entry.kind == "speech_reference")
     results: list[dict[str, object]] = []
     with httpx.Client(timeout=arguments.timeout_seconds, follow_redirects=False, trust_env=False) as client:
         for entry in scored_entries:
             try:
-                results.append(_evaluate_entry(client, endpoint, entry))
+                results.append(_evaluate_entry(client, endpoint, entry, headers))
             except CanonicalEvaluationFailure as error:
                 return 1, {
                     "schema_version": 1,
@@ -234,6 +259,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=Path("test_data/manifest.yaml"))
     parser.add_argument("--base-url", required=True)
+    parser.add_argument("--api-key-env", help="имя переменной окружения bearer key для remote HTTPS")
     parser.add_argument("--timeout-seconds", type=float, default=180.0)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()

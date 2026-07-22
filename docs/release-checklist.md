@@ -11,15 +11,14 @@ external CI/runtime artifact, not in `release-evidence/` or the repository.
 - [ ] Licensed corpus approval for the authored synthetic corpus: 5 calls, 714.802
   seconds, reference text/roles, 8 kHz and WAV/MP3/OGG.
 - [ ] Complete local `faster-whisper` + Community-1 WER/DER/role report for all five files, produced by `evaluate_canonical_speech.py`.
-- [x] Reviewed local faster-whisper and gated Community-1 artifact manifest hashes.
+- [ ] Independent reviewer attestation in `release-evidence/local-model-artifacts.json`, bound to `models/manifest.json` schema v3 and verified ASR/Community-1 artifact tree hashes, file counts, and revisions.
 - [ ] Groq credentials and approved remote raw-audio disclosure only for opt-in WebSocket provisional mode.
 - [x] Canonical batch ASR uses local `faster-whisper` medium+ equivalent (`large-v3-turbo`); ASR fallback is absent.
 - [x] Development OpenAI-compatible CLIProxyAPI model identity and local four-agent
   live smoke with retrieval and terminal submissions.
 - [ ] Final gateway HTTPS nonce-bound release attestation and canonical trace artifact
   with sanitized provider request ID hashes.
-- [ ] GPU benchmark from a self-hosted GPU runner, including workload revision and
-  measured limits; no CPU-derived GPU SLA claim.
+- [ ] GPU benchmark from a self-hosted GPU runner, including workload revision, measured limits, and a bearer-fetched `/v1/runtime` attestation matching the expected deployed immutable image digest; no local Docker image ID or CPU-derived GPU SLA claim.
 - [ ] Live Grafana browser proof, cleaned of PII.
 - [ ] WebSocket GPU p95 proof for the approved workload.
 - [ ] Canonical Docker application image built from frozen dependencies and its final

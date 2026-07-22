@@ -32,6 +32,8 @@ from mtbank_ai.observability import Telemetry
 from mtbank_ai.speech.streaming import (
     InternalSpeechWebSocketAdapter,
     InternalSpeechWebSocketSettings,
+    RemoteSpeechWebSocketAdapter,
+    RemoteSpeechWebSocketSettings,
     StreamingSpeechPort,
 )
 from mtbank_ai.storage.postgres import PostgresReadiness, create_postgres_engine
@@ -164,19 +166,22 @@ def _has_complete_workflow_configuration(settings: Settings) -> bool:
 def _build_streaming_speech_adapter(settings: Settings) -> StreamingSpeechPort | None:
     speech = settings.speech
     websocket = settings.websocket
-    if not websocket.enabled or speech is None or speech.mode != "internal_http":
+    if not websocket.enabled or speech is None:
         return None
-    return InternalSpeechWebSocketAdapter(
-        InternalSpeechWebSocketSettings(
-            base_url=str(speech.base_url),
-            stream_path=speech.streaming_path,
-            open_timeout_seconds=min(websocket.processing_timeout_seconds, speech.timeout_seconds),
-            ping_interval_seconds=min(20.0, websocket.max_duration_seconds),
-            ping_timeout_seconds=websocket.processing_timeout_seconds,
-            close_timeout_seconds=1.0,
-            max_message_bytes=websocket.max_frame_bytes + 4,
-        )
-    )
+    common = {
+        "base_url": str(speech.base_url),
+        "stream_path": speech.streaming_path,
+        "open_timeout_seconds": min(websocket.processing_timeout_seconds, speech.timeout_seconds),
+        "ping_interval_seconds": min(20.0, websocket.max_duration_seconds),
+        "ping_timeout_seconds": websocket.processing_timeout_seconds,
+        "close_timeout_seconds": 1.0,
+        "max_message_bytes": websocket.max_frame_bytes + 4,
+    }
+    if speech.mode == "internal_http":
+        return InternalSpeechWebSocketAdapter(InternalSpeechWebSocketSettings(**common))
+    if speech.api_key is None:
+        raise RuntimeError("remote speech configuration requires an API key")
+    return RemoteSpeechWebSocketAdapter(RemoteSpeechWebSocketSettings(**common, api_key=speech.api_key))
 
 
 async def _close_resources(*resources: object | None) -> None:

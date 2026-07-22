@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -10,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+import mtbank_ai.release.gates as release_gates
 from mtbank_ai.release.evidence import (
     EvidenceValidationError,
     export_evidence,
@@ -18,6 +20,7 @@ from mtbank_ai.release.evidence import (
     validate_evidence,
 )
 from mtbank_ai.release.gates import ReleaseGateContext, evaluate_release_gate, require_real_llm_environment
+from services.speech.manifest import ModelArtifact, ModelRegistry, SpeechModelManifest, artifact_tree_sha256
 
 ROOT = Path(__file__).parents[2]
 CODE_SHA = "a" * 40
@@ -53,6 +56,111 @@ def _trace_evidence(*, code_sha: str = CODE_SHA) -> dict[str, object]:
         },
         generated_at=datetime(2026, 7, 17, tzinfo=UTC),
     )
+
+
+def _local_model_evidence_root(tmp_path: Path) -> tuple[Path, dict[str, object]]:
+    artifacts = tmp_path / "models" / "artifacts"
+    asr = artifacts / "asr"
+    diarization = artifacts / "diarization"
+    asr.mkdir(parents=True)
+    diarization.mkdir(parents=True)
+    (asr / "model.bin").write_bytes(b"asr")
+    (diarization / "model.bin").write_bytes(b"diarization")
+    manifest = SpeechModelManifest(
+        asr=ModelArtifact(
+            package="faster-whisper",
+            package_version="1.2.1",
+            model_id="asr",
+            model_revision="asr-r1",
+            relative_path="asr",
+            artifact_sha256=artifact_tree_sha256(asr),
+        ),
+        diarization=ModelArtifact(
+            package="pyannote.audio",
+            package_version="4.0.7",
+            model_id="diarization",
+            model_revision="diarization-r1",
+            relative_path="diarization",
+            artifact_sha256=artifact_tree_sha256(diarization),
+        ),
+    )
+    manifest_path = tmp_path / "models" / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest.model_dump(mode="json")), encoding="utf-8")
+    registry = ModelRegistry(artifact_root=artifacts, manifest=manifest)
+    evidence = export_evidence(
+        kind="local-model-artifacts",
+        code_sha=CODE_SHA,
+        provenance={
+            "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+            "asr_artifact_sha256": manifest.asr.artifact_sha256,
+            "diarization_artifact_sha256": manifest.diarization.artifact_sha256,
+            "asr_model_revision": manifest.asr.model_revision,
+            "diarization_model_revision": manifest.diarization.model_revision,
+            "reviewer_id_sha256": "1" * 64,
+        },
+        metrics={"artifact_count": 2, "asr_file_count": 1, "diarization_file_count": 1},
+        observations={"model_set_id": "local-test"},
+    )
+    del registry
+    return tmp_path, evidence
+
+
+def _model_gate(context_root: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, object]:
+    monkeypatch.setattr(release_gates, "_current_code_sha", lambda _: CODE_SHA)
+    return evaluate_release_gate(ReleaseGateContext(root=context_root, environment={}))
+
+
+def _local_model_gate_result(manifest: dict[str, object]) -> dict[str, object]:
+    gates = manifest["gates"]
+    assert isinstance(gates, list)
+    gate = next(item for item in gates if isinstance(item, dict) and item.get("id") == "local_model_artifacts")
+    assert isinstance(gate, dict)
+    return gate
+
+
+def test_local_model_evidence_gate_accepts_verified_manifest_artifacts_and_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, evidence = _local_model_evidence_root(tmp_path)
+    path = root / "release-evidence" / "local-model-artifacts.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    manifest = _model_gate(root, monkeypatch)
+
+    gate = _local_model_gate_result(manifest)
+    assert gate["status"] == "passed"
+
+
+def test_local_model_evidence_gate_rejects_tampered_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, evidence = _local_model_evidence_root(tmp_path)
+    evidence["provenance"]["asr_model_revision"] = "tampered"  # type: ignore[index]
+    unsigned = {key: value for key, value in evidence.items() if key != "sha256"}
+    evidence["sha256"] = sha256(unsigned)
+    path = root / "release-evidence" / "local-model-artifacts.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    manifest = _model_gate(root, monkeypatch)
+
+    gate = _local_model_gate_result(manifest)
+    assert gate["status"] == "blocked"
+
+
+def test_local_model_evidence_gate_requires_separate_evidence_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, _ = _local_model_evidence_root(tmp_path)
+
+    manifest = _model_gate(root, monkeypatch)
+
+    gate = _local_model_gate_result(manifest)
+    assert gate["status"] == "blocked"
+    reason = gate["reason"]
+    assert isinstance(reason, str)
+    assert "local-model-artifacts.json" in reason
 
 
 def test_redaction_drops_nested_content_credentials_and_headers() -> None:

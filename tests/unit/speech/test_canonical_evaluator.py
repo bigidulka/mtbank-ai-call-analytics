@@ -48,6 +48,31 @@ def test_canonical_evaluator_rejects_noncanonical_base_url(base_url: str) -> Non
         _endpoint(base_url)
 
 
+def test_canonical_evaluator_bearer_mode_requires_safe_https_and_one_header(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    key = "N7!qR2@vL9#sX4$kM8%tY1^cD6&hJ3*F"
+    monkeypatch.setenv("CANONICAL_TEST_KEY", key)
+    headers = canonical_evaluator._bearer_headers("CANONICAL_TEST_KEY")
+    assert headers == {"Authorization": f"Bearer {key}"}
+    assert canonical_evaluator._endpoint("https://speech.test", bearer=True) == "https://speech.test/v1/transcribe"
+    for unsafe in ("http://speech.test", "https://key@speech.test", "https://speech.test?x=1"):
+        with pytest.raises(ValueError) as error:
+            canonical_evaluator._endpoint(unsafe, bearer=True)
+        assert key not in str(error.value)
+
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(502)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(CanonicalEvaluationFailure):
+            _evaluate_entry(client, "https://speech.test/v1/transcribe", _entry(tmp_path), headers)
+    assert captured[0].headers.get_list("authorization") == [f"Bearer {key}"]
+
+
 def test_canonical_evaluator_disables_environment_proxies(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     manifest = tmp_path / "manifest.yaml"
     manifest.write_text("fixtures: []\n", encoding="utf-8")
