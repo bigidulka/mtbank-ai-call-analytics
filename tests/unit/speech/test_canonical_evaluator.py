@@ -106,6 +106,22 @@ def test_canonical_evaluator_disables_environment_proxies(tmp_path: Path, monkey
     assert client_options == {"timeout": 12.5, "follow_redirects": False, "trust_env": False}
 
 
+def test_canonical_evaluator_retries_transient_service_failure(tmp_path: Path) -> None:
+    responses = iter((httpx.Response(500), httpx.Response(502)))
+    transport = httpx.MockTransport(lambda _request: next(responses))
+    with httpx.Client(transport=transport) as client:
+        with pytest.raises(CanonicalEvaluationFailure, match="provider_failure") as error:
+            _evaluate_entry(
+                client,
+                "http://speech.test/v1/transcribe",
+                _entry(tmp_path),
+                transient_retries=1,
+                retry_delay_seconds=0,
+            )
+
+    assert error.value.status_code == 502
+
+
 def test_canonical_evaluator_reports_role_resolution_failure_without_parsing_body(tmp_path: Path) -> None:
     transport = httpx.MockTransport(lambda _request: httpx.Response(409, text="do not store"))
     with httpx.Client(transport=transport) as client:

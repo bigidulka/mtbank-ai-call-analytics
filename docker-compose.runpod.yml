@@ -13,6 +13,8 @@ services:
       MTBANK_SPEECH__MODE: remote_https
       MTBANK_SPEECH__BASE_URL: ${MTBANK_RUNPOD_SPEECH_BASE_URL:?set public HTTPS RunPod speech URL}
       MTBANK_SPEECH__API_KEY: ${MTBANK_RUNPOD_SPEECH_BEARER_KEY:?set RunPod speech bearer key}
+      MTBANK_WEBSOCKET__ENABLED: ${MTBANK_WEBSOCKET_ENABLED:-false}
+      MTBANK_WEBSOCKET__ALLOWED_ORIGINS: '["${MTBANK_WEBSOCKET_ALLOWED_ORIGIN:-https://example.invalid}"]'
 
   speech:
     profiles:

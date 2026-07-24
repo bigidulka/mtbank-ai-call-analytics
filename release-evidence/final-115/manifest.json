@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "path": "canonical-speech-evaluation.json",
+      "sha256": "e4dd65644037335233de62d8e3add525bb0bea2b4c08ffef502d1ce7ebf7364c",
+      "bytes": 12102
+    },
+    {
+      "path": "public-five-minute-sla.json",
+      "sha256": "11fde3a6ce14199188168f0033389cac38609f0bc59b59eddd48bff4d21b9938",
+      "bytes": 712
+    },
+    {
+      "path": "trends-response.json",
+      "sha256": "eee39049719dfa50d09f9cd5c50357f755ffcb2e93aae9a484cd4a1e582ff5c5",
+      "bytes": 7861
+    },
+    {
+      "path": "websocket-p95.json",
+      "sha256": "68b223c4bcbf4b4c96977d0d3aa4096b77c957ecd7da420048bffafd66b28611",
+      "bytes": 758
+    }
+  ]
+}

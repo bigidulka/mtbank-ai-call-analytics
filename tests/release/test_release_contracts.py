@@ -354,4 +354,12 @@ def test_versioned_gate_ids_include_external_hard_block_without_false_evidence()
         "websocket_gpu_p95",
         "canonical_app_image",
     }
-    assert not (ROOT / "release-evidence").exists()
+    evidence_root = ROOT / "release-evidence" / "final-115"
+    assert evidence_root.is_dir()
+    assert {path.name for path in evidence_root.glob("*.json")} == {
+        "canonical-speech-evaluation.json",
+        "manifest.json",
+        "public-five-minute-sla.json",
+        "trends-response.json",
+        "websocket-p95.json",
+    }

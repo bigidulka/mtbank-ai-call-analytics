@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
+import time
+import wave
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
@@ -92,6 +95,100 @@ class StreamingSpeechUnavailable:
     async def open(self, start: StreamingStart) -> StreamingSpeechSession:
         del start
         raise StreamingAdapterUnavailable("streaming speech adapter is unavailable")
+
+
+class RollingHttpSpeechAdapter:
+    """Uses bounded canonical speech HTTP calls for provisional PCM updates."""
+
+    def __init__(
+        self,
+        transcriber: Any,
+        *,
+        window_seconds: float = 12.0,
+        step_seconds: float = 1.5,
+        request_timeout_seconds: float = 3.0,
+    ) -> None:
+        if window_seconds <= 0 or step_seconds <= 0 or request_timeout_seconds <= 0:
+            raise ValueError("rolling HTTP streaming limits must be positive")
+        if step_seconds > window_seconds:
+            raise ValueError("rolling HTTP step cannot exceed window")
+        self._transcriber = transcriber
+        self._window_bytes = int(window_seconds * 16_000 * 2)
+        self._step_bytes = int(step_seconds * 16_000 * 2)
+        self._request_timeout_seconds = request_timeout_seconds
+
+    async def open(self, start: StreamingStart) -> StreamingSpeechSession:
+        if start.codec != "pcm_s16le":
+            raise StreamingAdapterUnavailable("rolling HTTP streaming supports PCM16 only")
+        return _RollingHttpSpeechSession(
+            self._transcriber,
+            window_bytes=self._window_bytes,
+            step_bytes=self._step_bytes,
+            request_timeout_seconds=self._request_timeout_seconds,
+        )
+
+
+class _RollingHttpSpeechSession:
+    def __init__(
+        self,
+        transcriber: Any,
+        *,
+        window_bytes: int,
+        step_bytes: int,
+        request_timeout_seconds: float,
+    ) -> None:
+        self._transcriber = transcriber
+        self._window_bytes = window_bytes
+        self._step_bytes = step_bytes
+        self._request_timeout_seconds = request_timeout_seconds
+        self._pcm = bytearray()
+        self._last_requested_bytes = 0
+        self._closed = False
+
+    async def push(self, frame: bytes, *, sequence: int) -> tuple[StreamingUpdate, ...]:
+        if self._closed or not frame or len(frame) % 2:
+            raise StreamingAdapterUnavailable("rolling HTTP session rejected frame")
+        self._pcm.extend(frame)
+        if len(self._pcm) < self._window_bytes or len(self._pcm) - self._last_requested_bytes < self._step_bytes:
+            return ()
+        self._last_requested_bytes = len(self._pcm)
+        window = bytes(self._pcm[-self._window_bytes :])
+        try:
+            response = await asyncio.wait_for(
+                self._transcriber.transcribe(
+                    _rolling_speech_file(window, sequence),
+                ),
+                timeout=self._request_timeout_seconds,
+            )
+        except Exception:
+            return ()
+        text = " ".join(segment.text for segment in response.transcript.segments).strip()
+        if not text:
+            return ()
+        return (StreamingUpdate(sequence=sequence, text=text, stable_prefix=False),)
+
+    async def finish(self) -> tuple[StreamingUpdate, ...]:
+        self._closed = True
+        return ()
+
+    async def close(self) -> None:
+        self._closed = True
+
+
+def _rolling_speech_file(pcm: bytes, sequence: int) -> Any:
+    from mtbank_ai.speech.contracts import SpeechFile
+
+    output = io.BytesIO()
+    with wave.open(output, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(16_000)
+        wav.writeframes(pcm)
+    return SpeechFile(
+        filename=f"rolling-{sequence}-{time.monotonic_ns()}.wav",
+        content_type="audio/wav",
+        content=output.getvalue(),
+    )
 
 
 class _WebSocketConnection(Protocol):

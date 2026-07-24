@@ -15,6 +15,10 @@ coverage.xml
 htmlcov/
 tmp/
 release-evidence/
+!release-evidence/
+release-evidence/*
+!release-evidence/final-115/
+!release-evidence/final-115/*.json
 secrets/
 models/artifacts/
 models/*

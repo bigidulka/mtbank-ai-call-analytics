@@ -1,43 +1,115 @@
 # MTBank AI Call Analytics
 
-Решение тестового задания MTBank для анализа русскоязычных звонков: транскрибация, диаризация, определение ролей и четыре независимых LLM-агента.
+Решение тестового задания MTBank: публичный OpenWebUI Pipeline для транскрибации и аналитики русскоязычных банковских звонков.
 
-**Демо:** https://cloud.cloud-tunnel-mega-obx1.space
-**Текст задания:** [`docs/assignment.md`](docs/assignment.md)
+- **Демо:** https://mtbank.arbitron.dev
+- **Grafana:** https://mtbank.arbitron.dev/grafana/
+- **Задание:** [`docs/assignment.md`](docs/assignment.md)
+- **Финальные evidence:** [`release-evidence/final-115/`](release-evidence/final-115/)
 
-## Схема
+## Архитектура
 
 ```text
-OpenWebUI Pipeline / REST / WebSocket
-                ↓
-local faster-whisper large-v3-turbo → local pyannote Community-1 → role resolution
-                ↓
-classifier · quality · compliance · summarizer
-                ↓
-PostgreSQL · Trends · Prometheus/Grafana
+OpenWebUI Pipeline / POST /analyze / WSS /ws/transcribe
+                         │
+                         ▼
+RunPod GPU speech: faster-whisper large-v3-turbo
+                  + pyannote Community-1
+                  + timestamps / speaker roles
+                         │
+                         ▼
+classifier ─ quality ─ compliance ─ summarizer
+                         │
+                         ▼
+PostgreSQL ─ Trends agent ─ Prometheus ─ Grafana
 ```
 
-## Возможности
+App-plane работает на отдельном сервере через Docker Compose. Canonical speech работает на GPU Pod по authenticated HTTPS. Четыре LLM-агента используют OpenAI-compatible серверный gateway. Transcript считается недоверенным input; агенты получают bounded tools и typed output contracts.
 
-- обязательный OpenWebUI `Pipeline` с проверкой ownership, MIME и audio magic;
-- WAV, MP3 и OGG; нормализация через FFmpeg;
-- transcript с timestamps, speaker/role, классификация, quality checklist, compliance issues, summary и action items;
-- PostgreSQL persistence, `POST /analyze`, `/trends`, opt-in `/ws/transcribe`;
-- Grafana, Prometheus и bounded WebSocket streaming;
-- versioned policies, typed agent outputs и deterministic aggregation.
+## Что реализовано
 
-Типизированный собственный Supervisor выбран вместо LangGraph: линейный bounded workflow «speech → 4 агента → aggregation» не требует checkpoint-графа или human-in-the-loop state и остаётся проще для проверки.
+- обязательный OpenWebUI `Pipeline` с upload WAV/MP3/OGG;
+- local `faster-whisper` `large-v3-turbo` в GPU speech container;
+- local pyannote Community-1 (`pyannote/speaker-diarization-community-1`) offline;
+- timestamps, diarization и роли `Оператор` / `Клиент`;
+- четыре независимых агента: classifier, quality, compliance, summarizer;
+- deterministic aggregation, evidence IDs и typed schemas;
+- `POST /analyze`, `POST /trends`, `WSS /ws/transcribe`;
+- PostgreSQL persistence и lifecycle events;
+- Prometheus + provisioned Grafana dashboard;
+- JSON logging, readiness, bounded retries, circuit breaker, secret validation;
+- public HTTPS deployment.
 
-## Тестовые звонки
+Собственный bounded Supervisor выбран вместо LangGraph: workflow фиксирован как `speech → 4 parallel agents → deterministic aggregation`, поэтому checkpoint-граф и human-in-the-loop state не нужны.
 
-В [`test_data/`](test_data/) находятся пять authored synthetic русскоязычных диалогов (WAV/MP3/OGG, 8/16 kHz, 714.802 с) с reference-разметкой. Реальные клиентские и production-данные не используются.
+## Результаты ASR и диаризации
 
-## Запуск
+Корпус: пять authored synthetic русскоязычных банковских диалогов, 714.802 секунды. Реальные клиенты и production PII не использовались. Reference-разметка и provenance находятся в [`test_data/manifest.yaml`](test_data/manifest.yaml).
+
+| Файл | Формат | Hz | Длительность | WER | DER | Role accuracy | GPU latency |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `synthetic-credit-consultation` | WAV | 16000 | 239.546 | 8.89% | 19.11% | 84.20% | 9.797 с |
+| `synthetic-card-complaint-telephone` | WAV | 8000 | 119.434 | 5.26% | 19.95% | 84.94% | 4.361 с |
+| `synthetic-transfer-question` | MP3 | 16000 | 114.850 | 6.10% | 20.97% | 84.27% | 3.893 с |
+| `synthetic-mobile-app-security` | OGG | 16000 | 113.194 | 4.82% | 21.29% | 83.70% | 4.097 с |
+| `synthetic-deposit-consultation` | WAV | 16000 | 127.778 | 6.29% | 21.67% | 82.69% | 4.943 с |
+| **Micro aggregate** | — | — | **714.802** | **6.76%** | **20.34%** | **83.99%** | **27.091 с** |
+
+Полный машинно-читаемый результат: [`canonical-speech-evaluation.json`](release-evidence/final-115/canonical-speech-evaluation.json). Evaluator повторяет только transient `429/500/503/504`; schema, role-resolution и provider failures остаются fail-closed.
+
+## Live SLA и бонусы
+
+### Публичный файл ровно 5 минут
+
+Публичный `POST /analyze` на финальном hostname обработал workload длительностью **300.0 с** за **35.979 с**, HTTP `200`, включая canonical speech, четыре агента, aggregation и persistence. Требование `<60 с` выполнено.
+
+Evidence: [`public-five-minute-sla.json`](release-evidence/final-115/public-five-minute-sla.json).
+
+### WebSocket real-time: +5
+
+Публичный `wss://mtbank.arbitron.dev/ws/transcribe` отправил первый provisional transcript за **1428.098 мс**; measured p95/max = **1428.098 мс**, затем canonical reconciliation завершился за 18.416 с. Требование `<3 с` выполнено.
+
+Provisional path использует bounded rolling 12-second canonical GPU windows с cadence 1.5 с и timeout 3 с. Финальный результат всегда повторно проходит полный canonical batch + четыре агента.
+
+Evidence: [`websocket-p95.json`](release-evidence/final-115/websocket-p95.json).
+
+### Grafana: +5
+
+Dashboard `MTBank AI observability` содержит:
+
+- Calls;
+- Quality total;
+- Top topics;
+- Stage latency;
+- Errors;
+- Agent tokens.
+
+Provisioning: [`monitoring/grafana/`](monitoring/grafana/).
+
+### Trends agent: +5
+
+`POST /trends` работает только по sanitized persisted analyses. Финальная проверка: 11 calls, 3 supporting calls, rate 27.27%, confidence 0.9, evidence-backed recommendation.
+
+Evidence: [`trends-response.json`](release-evidence/final-115/trends-response.json).
+
+## Как проверить демо
+
+1. Открыть https://mtbank.arbitron.dev.
+2. Войти или создать demo user в OpenWebUI.
+3. Выбрать MTBank Pipeline.
+4. Загрузить рекомендуемый файл [`test_data/synthetic/mobile-app-security-16k.ogg`](test_data/synthetic/mobile-app-security-16k.ogg).
+5. Получить transcript с timestamps/roles, classification, quality checklist, compliance, summary и action items.
+6. Для observability открыть `/grafana/` с предоставленными reviewer credentials.
+
+REST API требует `Authorization: Bearer <MTBANK_API_KEY>` и принимает ровно один source: multipart `file` или JSON `{"url":"https://..."}`. Полный contract: [`docs/api.md`](docs/api.md).
+
+## Локальный запуск
 
 ```bash
 cp .env.example .env
-# Fill every blank secret plus gateway/model values; set MTBANK_WORKFLOW__CODE_SHA to git rev-parse HEAD.
-# Provision local ASR + Community-1 artifacts first (HF_TOKEN is required for gated Community-1):
+# Заполнить все секреты и gateway/model values.
+# MTBANK_WORKFLOW__CODE_SHA=$(git rev-parse HEAD)
+
 HF_TOKEN=... uv run python scripts/provision_speech_models.py \
   --artifact-root models/artifacts \
   --output-manifest models/manifest.json \
@@ -46,41 +118,34 @@ HF_TOKEN=... uv run python scripts/provision_speech_models.py \
 docker compose up --build --wait
 ```
 
-Нужны Docker Compose, около 16 GB RAM и 12 GB свободного места для образов и моделей.
-Для five-minute SLA нужен NVIDIA GPU и GPU overlay; CPU mode предназначен для локальной
-проверки. Weights в `models/artifacts/` и `.env` намеренно не входят в Git. Полный
-clean-clone runbook и rollback tunnel: [`docs/operations.md`](docs/operations.md).
+Требования: Docker Compose, FFmpeg, около 16 GB RAM и 12 GB disk. GPU overlay и split RunPod deployment описаны в [`docs/operations.md`](docs/operations.md) и [`deploy/runpod/README.md`](deploy/runpod/README.md).
 
-OpenWebUI: `http://127.0.0.1:${OPENWEBUI_PORT:-3000}`.
-
-GPU и WebSocket включаются отдельными overlays:
+## Воспроизводимая проверка
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile gpu up --build --wait
-MTBANK_WEBSOCKET_ALLOWED_ORIGIN=https://example.org \
-  docker compose -f docker-compose.yml -f docker-compose.websocket.yml up --build --wait
-```
-
-API contract: [`docs/api.md`](docs/api.md). Архитектура и privacy boundary: [`docs/architecture.md`](docs/architecture.md), [`docs/privacy.md`](docs/privacy.md).
-
-RunPod GPU Pod запускает только GPU speech container; он не запускает Docker Compose. Split-GPU deployment foundation и remote bearer boundary: [`deploy/runpod/README.md`](deploy/runpod/README.md).
-
-## Проверка
-
-```bash
-uv run --offline --no-sync pytest -m "not real_llm and not gpu and not integration"
 uv run --offline --no-sync ruff check .
+uv run --offline --no-sync ruff format --check .
 uv run --offline --no-sync pyright
-uv lock --check && uv lock --check --directory services/speech
+uv run --offline --no-sync pytest -m "not integration and not real_llm and not gpu"
+uv lock --check
+uv lock --check --directory services/speech
 docker compose -f docker-compose.yml config --quiet
 ```
 
-## Бонусы
+Canonical evaluator:
 
-- WebSocket real-time transcription;
-- Grafana dashboard и Prometheus metrics;
-- evidence-backed Trends agent.
+```bash
+export MTBANK_RUNPOD_SPEECH_BEARER_KEY='...'
+uv run --offline --no-sync python scripts/evaluate_canonical_speech.py \
+  --base-url 'https://<pod-id>-8010.proxy.runpod.net' \
+  --api-key-env MTBANK_RUNPOD_SPEECH_BEARER_KEY \
+  --output release-evidence/canonical-speech-evaluation.json
+```
 
 ## Ограничения
 
-Canonical batch runtime использует local `faster-whisper` `large-v3-turbo` (CTranslate2) и local pyannote Community-1; ASR fallback отсутствует. Opt-in WebSocket provisional mode отдельно использует Groq и не влияет на batch ASR requirement. Five-minute CPU benchmark на этом хосте завершился HTTP 200 за **483.178 с** — SLA `<60 с` не выполнен. Canonical corpus-wide WER/DER/role metrics и GPU WebSocket p95 не заявляются: controlled evaluator остановился fail-closed после 3/5 files на HTTP 500.
+- Public demo предназначен только для synthetic/no-PII audio.
+- RunPod GPU — оплачиваемый ephemeral compute; во время reviewer window Pod должен оставаться запущенным.
+- DER и role accuracy измерены на authored synthetic corpus и не являются банковским production benchmark.
+- Rolling WebSocket partials provisional; authoritative result появляется только после canonical reconciliation.
+- Полноценный банковский production требует отдельной модели угроз, DLP/KMS, retention approvals, HA, private networking и formal model governance.
