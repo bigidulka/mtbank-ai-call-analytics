@@ -469,7 +469,10 @@ def test_gateway_config_limits_body_and_keeps_streaming_proxy_settings() -> None
 
 
 def test_verify_skill_checks_port_bindings_without_compose_port() -> None:
-    skill = (ROOT / ".claude" / "skills" / "verify" / "SKILL.md").read_text(encoding="utf-8")
+    skill_path = ROOT / ".claude" / "skills" / "verify" / "SKILL.md"
+    if not skill_path.is_file():
+        pytest.skip("local verify skill is intentionally not part of release repository")
+    skill = skill_path.read_text(encoding="utf-8")
 
     assert "\n   docker compose port" not in skill
     assert ".HostConfig.PortBindings" in skill
