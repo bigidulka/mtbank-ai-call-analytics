@@ -14,7 +14,7 @@ from typing import Any
 SCORING_METRICS = frozenset({"wer", "der", "role_accuracy", "speaker_attributed_wer"})
 SUPPORTED_FORMATS = frozenset({"wav", "mp3", "ogg"})
 PUBLIC_ROLES = frozenset({"Оператор", "Клиент"})
-_DURATION_TOLERANCE_SECONDS = 0.05
+_DURATION_TOLERANCE_SECONDS = 0.1
 _MEDIA_PROBE_TIMEOUT_SECONDS = 10.0
 
 

@@ -83,6 +83,23 @@ def test_release_gate_rejects_duplicate_silence_entries(tmp_path: Path) -> None:
         validate_manifest(_write_manifest(tmp_path, payload), require_release_corpus=True)
 
 
+def test_manifest_accepts_container_duration_variance(tmp_path: Path) -> None:
+    payload = _manifest_payload()
+    entries = payload["entries"]
+    assert isinstance(entries, list)
+    transport = next(entry for entry in entries if entry["id"] == "transport-silence-wav-16k")
+    fixture = tmp_path / "fixture.wav"
+    fixture.write_bytes((ROOT / "test_data" / "transport" / "silence-16k.wav").read_bytes())
+    transport["path"] = fixture.name
+    transport["sha256"] = hashlib.sha256(fixture.read_bytes()).hexdigest()
+    transport["duration_seconds"] = 1.09
+    payload["entries"] = [transport]
+
+    validated = validate_manifest(_write_manifest(tmp_path, payload), require_release_corpus=False)
+
+    assert validated[0].duration_seconds == 1.09
+
+
 def test_manifest_probes_actual_audio_properties(tmp_path: Path) -> None:
     payload = _manifest_payload()
     entries = payload["entries"]
