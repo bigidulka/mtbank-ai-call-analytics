@@ -502,9 +502,7 @@ def _matches_bearer_key(authorizations: list[str], settings: SpeechSettings) -> 
     if scheme != "Bearer" or configured_key is None or not presented_key:
         return False
     try:
-        return hmac.compare_digest(
-            presented_key.encode("ascii"), configured_key.get_secret_value().encode("ascii")
-        )
+        return hmac.compare_digest(presented_key.encode("ascii"), configured_key.get_secret_value().encode("ascii"))
     except UnicodeEncodeError:
         return False
 

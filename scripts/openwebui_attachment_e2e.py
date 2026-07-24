@@ -34,6 +34,8 @@ _DISABLED_ORDINARY_USER_PERMISSIONS = {
     ("chat", "call"): False,
     ("features", "web_search"): False,
 }
+
+
 def _required_env(name: str) -> str:
     value = os.getenv(name)
     if not value:

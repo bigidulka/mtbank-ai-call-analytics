@@ -36,9 +36,20 @@ PostgreSQL · Trends · Prometheus/Grafana
 
 ```bash
 cp .env.example .env
-# Заполнить обязательные secrets и пути к локальному diarization artifact.
+# Fill every blank secret plus gateway/model values; set MTBANK_WORKFLOW__CODE_SHA to git rev-parse HEAD.
+# Provision local ASR + Community-1 artifacts first (HF_TOKEN is required for gated Community-1):
+HF_TOKEN=... uv run python scripts/provision_speech_models.py \
+  --artifact-root models/artifacts \
+  --output-manifest models/manifest.json \
+  --cache-dir .cache/mtbank-speech-models
+
 docker compose up --build --wait
 ```
+
+Нужны Docker Compose, около 16 GB RAM и 12 GB свободного места для образов и моделей.
+Для five-minute SLA нужен NVIDIA GPU и GPU overlay; CPU mode предназначен для локальной
+проверки. Weights в `models/artifacts/` и `.env` намеренно не входят в Git. Полный
+clean-clone runbook и rollback tunnel: [`docs/operations.md`](docs/operations.md).
 
 OpenWebUI: `http://127.0.0.1:${OPENWEBUI_PORT:-3000}`.
 

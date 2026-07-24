@@ -527,7 +527,7 @@ def test_runtime_e2e_covers_privacy_and_processing_negatives() -> None:
     assert '"/api/chat/completions", "/api/v1/chat/completions"' in attachment_e2e
     assert "user_message" in attachment_e2e
     assert "/api/v1/chats/new" in attachment_e2e
-    assert "_CANONICAL_FIXTURE_ID = \"synthetic-card-complaint-telephone\"" in attachment_e2e
+    assert '_CANONICAL_FIXTURE_ID = "synthetic-card-complaint-telephone"' in attachment_e2e
     assert "AnalyzeResponse.model_validate(payload)" in attachment_e2e
     assert "<pre>(.*?)</pre>" in attachment_e2e
     assert "production Pipeline output не должен echo authoritative filename" in attachment_e2e
@@ -561,9 +561,7 @@ def test_monitoring_stack_is_pinned_private_and_dashboard_queries_emitted_metric
     grafana = _service(compose, "grafana")
     collector = _service(compose, "otel-collector")
     tempo = _service(compose, "tempo")
-    dashboard = (ROOT / "monitoring" / "grafana" / "dashboards" / "mtbank-overview.json").read_text(
-        encoding="utf-8"
-    )
+    dashboard = (ROOT / "monitoring" / "grafana" / "dashboards" / "mtbank-overview.json").read_text(encoding="utf-8")
 
     for service in (prometheus, grafana, collector, tempo):
         assert "@sha256:" in service

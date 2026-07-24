@@ -63,15 +63,9 @@ def require_environment_secret(name: str, environment: Mapping[str, str | None])
 def validate_runtime_secrets(environment: Mapping[str, str | None]) -> None:
     """Проверяет все обязательные секреты, не раскрывая их значения."""
 
-    invalid_names = [
-        name
-        for name in RUNTIME_SECRET_NAMES
-        if not _is_safe_secret(environment.get(name))
-    ]
+    invalid_names = [name for name in RUNTIME_SECRET_NAMES if not _is_safe_secret(environment.get(name))]
     if invalid_names:
-        raise SecretConfigurationError(
-            "Небезопасные runtime-секреты: " + ", ".join(invalid_names)
-        )
+        raise SecretConfigurationError("Небезопасные runtime-секреты: " + ", ".join(invalid_names))
 
 
 def _is_safe_secret(value: str | None) -> bool:

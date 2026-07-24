@@ -59,9 +59,10 @@ def run(arguments: argparse.Namespace) -> tuple[int, dict[str, object]]:
         _make_five_minutes(arguments.audio, workload)
         duration = _duration_seconds(workload)
         started = time.monotonic()
-        with workload.open("rb") as audio, httpx.Client(
-            timeout=arguments.timeout_seconds, follow_redirects=False, trust_env=False
-        ) as client:
+        with (
+            workload.open("rb") as audio,
+            httpx.Client(timeout=arguments.timeout_seconds, follow_redirects=False, trust_env=False) as client,
+        ):
             response = client.post(
                 endpoint,
                 files={"file": (workload.name, audio, "audio/wav")},
@@ -115,12 +116,15 @@ def main() -> int:
     try:
         status, result = run(arguments)
     except ValueError as error:
-        status, result = 1, {
-            "schema_version": 1,
-            "kind": "public-analyze-five-minute-sla",
-            "status": "failed",
-            "reason": str(error),
-        }
+        status, result = (
+            1,
+            {
+                "schema_version": 1,
+                "kind": "public-analyze-five-minute-sla",
+                "status": "failed",
+                "reason": str(error),
+            },
+        )
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"status": result["status"], "output": str(arguments.output)}))

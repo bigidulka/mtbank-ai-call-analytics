@@ -140,9 +140,7 @@ def test_local_model_evidence_gate_accepts_verified_manifest_artifacts_and_bindi
     assert external["status"] == "blocked"
 
 
-def test_local_model_evidence_gate_rejects_tampered_binding(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_local_model_evidence_gate_rejects_tampered_binding(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root, evidence = _local_model_evidence_root(tmp_path)
     evidence["provenance"]["asr_model_revision"] = "tampered"  # type: ignore[index]
     unsigned = {key: value for key, value in evidence.items() if key != "sha256"}

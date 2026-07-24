@@ -258,9 +258,7 @@ def test_trends_preflight_rejects_invalid_samples_before_any_model_call() -> Non
             (_repository(((1, "credit"), (2, "credit"), (3, "cards"), (4, "cards"))), TrendsSettings()),
             (_repository(()), TrendsSettings()),
             (
-                _repository(
-                    ((1, "credit"), (2, "credit"), (3, "cards"), (4, "credit"), (5, "cards"), (6, "credit"))
-                ),
+                _repository(((1, "credit"), (2, "credit"), (3, "cards"), (4, "credit"), (5, "cards"), (6, "credit"))),
                 TrendsSettings(max_records=5),
             ),
         )

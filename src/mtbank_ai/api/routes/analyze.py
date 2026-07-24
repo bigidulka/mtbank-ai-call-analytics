@@ -56,9 +56,7 @@ _REQUEST_BODY = {
                     "properties": {"file": {"type": "string", "format": "binary"}},
                 }
             },
-            "application/json": {
-                "schema": {"$ref": "#/components/schemas/UrlAnalyzeRequest"}
-            },
+            "application/json": {"schema": {"$ref": "#/components/schemas/UrlAnalyzeRequest"}},
         },
     }
 }

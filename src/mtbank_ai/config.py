@@ -132,13 +132,7 @@ def _validate_speech_base_url(value: HttpUrl, mode: SpeechTransportMode) -> Http
         parts.port
     except ValueError:
         raise ValueError("speech base_url имеет некорректную authority") from None
-    if (
-        not parts.hostname
-        or parts.username is not None
-        or parts.password is not None
-        or parts.query
-        or parts.fragment
-    ):
+    if not parts.hostname or parts.username is not None or parts.password is not None or parts.query or parts.fragment:
         raise ValueError("speech base_url не может содержать credentials, query или fragment")
     if mode == "internal_http":
         if parts.scheme != "http" or not (

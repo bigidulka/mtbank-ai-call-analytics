@@ -129,11 +129,16 @@ def test_snapshot_requires_nondecreasing_unique_segments_but_allows_overlap() ->
         needs_review=False,
     )
 
-    assert _snapshot(
-        segments=(first, overlapping),
-        duration_seconds=3.0,
-        role_resolution=resolution,
-    ).segments[1].start < first.end
+    assert (
+        _snapshot(
+            segments=(first, overlapping),
+            duration_seconds=3.0,
+            role_resolution=resolution,
+        )
+        .segments[1]
+        .start
+        < first.end
+    )
     with pytest.raises(ValidationError, match="отсортированы"):
         _snapshot(segments=(overlapping, first), duration_seconds=3.0, role_resolution=resolution)
     with pytest.raises(ValidationError, match="уникальны"):

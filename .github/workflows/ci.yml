@@ -67,7 +67,8 @@ jobs:
       - name: Run destructive migration suite against disposable database
         env:
           MTBANK_ALLOW_DESTRUCTIVE_DB_TESTS: "1"
-          MTBANK_TEST_DATABASE_URL: postgresql+asyncpg://mtbank_test:ci-disposable-only@localhost:5432/mtbank_test_ci
+          # PostgreSQL service exposes IPv4 on the hosted runner; avoid localhost resolving to unavailable ::1.
+          MTBANK_TEST_DATABASE_URL: postgresql+asyncpg://mtbank_test:ci-disposable-only@127.0.0.1:5432/mtbank_test_ci
         run: uv run pytest tests/integration/test_postgres_migrations.py
 
   canonical-app-image:

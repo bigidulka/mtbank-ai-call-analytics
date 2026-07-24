@@ -202,8 +202,7 @@ def test_policy_resolver_preserves_role_evaluation_metrics_for_all_reference_fix
     assert isinstance(raw_segments, list)
     roles = _assigned_roles(_reference_segments(reference_path, client_first=True))
     reference = tuple(
-        Segment(item["id"], item["start"], item["end"], item["speaker"], item["text"])
-        for item in raw_segments
+        Segment(item["id"], item["start"], item["end"], item["speaker"], item["text"]) for item in raw_segments
     )
     hypothesis = tuple(
         Segment(

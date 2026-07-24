@@ -75,15 +75,9 @@ def word_error_counts(reference: tuple[str, ...], hypothesis: tuple[str, ...]) -
 def corpus_wer(reference: tuple[Segment, ...], hypothesis: tuple[Segment, ...]) -> ErrorCounts:
     """Compares time-ordered text, not evaluator-specific segment IDs or boundaries."""
 
-    reference_tokens = tuple(
-        token
-        for segment in _time_ordered(reference)
-        for token in normalize_tokens(segment.text)
-    )
+    reference_tokens = tuple(token for segment in _time_ordered(reference) for token in normalize_tokens(segment.text))
     hypothesis_tokens = tuple(
-        token
-        for segment in _time_ordered(hypothesis)
-        for token in normalize_tokens(segment.text)
+        token for segment in _time_ordered(hypothesis) for token in normalize_tokens(segment.text)
     )
     return word_error_counts(reference_tokens, hypothesis_tokens)
 
@@ -147,16 +141,10 @@ def speaker_attributed_wer(reference: tuple[Segment, ...], hypothesis: tuple[Seg
     counts = ErrorCounts(0, 0, 0, 0)
     for role in sorted(_PUBLIC_ROLES):
         reference_tokens = tuple(
-            token
-            for segment in reference
-            if segment.speaker == role
-            for token in normalize_tokens(segment.text)
+            token for segment in reference if segment.speaker == role for token in normalize_tokens(segment.text)
         )
         hypothesis_tokens = tuple(
-            token
-            for segment in hypothesis
-            if segment.speaker == role
-            for token in normalize_tokens(segment.text)
+            token for segment in hypothesis if segment.speaker == role for token in normalize_tokens(segment.text)
         )
         counts = _add_counts(counts, word_error_counts(reference_tokens, hypothesis_tokens))
     return counts

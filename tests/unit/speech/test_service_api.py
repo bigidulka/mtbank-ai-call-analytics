@@ -295,9 +295,7 @@ def test_bearer_access_protects_remote_speech_boundary_and_keeps_live_anonymous(
     async def scenario() -> None:
         key = "X2v9Qa7Lm4Rc8Nd6Hs3Kp5Zw1By0TeUf"
         settings = SpeechSettings(
-            runtime=SpeechRuntimeSettings(
-                temp_root=str(tmp_path / "work"), image_digest="sha256:" + "a" * 64
-            ),
+            runtime=SpeechRuntimeSettings(temp_root=str(tmp_path / "work"), image_digest="sha256:" + "a" * 64),
             access=SpeechAccessSettings(mode="bearer", bearer_key=SecretStr(key)),
         )
         app = create_app(settings=settings, runtime=StubRuntime())

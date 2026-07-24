@@ -460,8 +460,6 @@ def test_openapi_is_exact_for_media_types_bearer_security_and_public_response() 
         assert operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
             "/AnalyzeResponse"
         )
-        assert operation["responses"]["401"]["content"]["application/json"]["schema"]["$ref"].endswith(
-            "/ErrorResponse"
-        )
+        assert operation["responses"]["401"]["content"]["application/json"]["schema"]["$ref"].endswith("/ErrorResponse")
 
     asyncio.run(scenario())
