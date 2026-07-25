@@ -51,7 +51,7 @@ def _runtime() -> AgentRuntimeSettings:
     )
 
 
-def test_demo_assistant_uses_real_model_with_bounded_history_and_no_tools() -> None:
+def test_demo_assistant_uses_reviewed_prompt_and_real_model_with_bounded_history_and_no_tools() -> None:
     client = TextClient()
     assistant = DemoAssistant(client, _runtime())
     request = AssistantRequest(
@@ -77,6 +77,7 @@ def test_demo_assistant_uses_real_model_with_bounded_history_and_no_tools() -> N
     assert model_request.messages[-1].content == "Что ты умеешь?"
     assert model_request.messages[0].content is not None
     assert "secrets" in model_request.messages[0].content
+    assert "text-only LLM-agent" in model_request.messages[0].content
     assert 0 < (client.deadlines[0] - datetime.now(UTC)).total_seconds() <= 15
 
 
@@ -93,7 +94,7 @@ def test_demo_assistant_rejects_oversized_or_invalid_history() -> None:
 
 
 def test_demo_assistant_rejects_model_drift_or_missing_text() -> None:
-    wrong_model = DemoAssistant(TextClient(model_id="fallback-model"), _runtime())
+    wrong_model = DemoAssistant(TextClient(model_id="unconfigured-model"), _runtime())
     with pytest.raises(ValueError, match="text response"):
         asyncio.run(wrong_model.answer(AssistantRequest(message="hi")))
 

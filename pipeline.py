@@ -44,43 +44,8 @@ _JSON_RESPONSE_MAX_BYTES = 1 * 1024 * 1024
 _TEXT_ASSISTANT_MAX_HISTORY_MESSAGES = 8
 _TEXT_ASSISTANT_MAX_MESSAGE_CHARS = 2_000
 _ATTACHMENT_UNAVAILABLE_MESSAGE = "Вложение недоступно. Загрузите файл заново и повторите запрос."
+_TEXT_ASSISTANT_UNAVAILABLE_MESSAGE = "Текстовый помощник временно недоступен. Повторите запрос позже."
 _TEXT_ASSISTANT_MARKER = "text_assistant"
-_TEXT_ASSISTANT_OVERVIEW = """## MTBank AI Call Analytics
-
-Я помогу проверить демо.
-
-**Быстрый сценарий:**
-1. Выберите модель **MTBank Attachment Probe**.
-2. Прикрепите один аудиофайл WAV, MP3 или OGG.
-3. Отправьте сообщение — система вернёт transcript с timestamps и ролями,
-   classification, quality checklist, compliance, summary и action items.
-
-Также доступны REST `POST /analyze`, WebSocket `/ws/transcribe`,
-Trends `/trends` и Grafana `/grafana/`.
-
-Можно спросить: **«Какие форматы?»**, **«Как проверить API?»**,
-**«Что показывает Grafana?»** или **«Как работает streaming?»**."""
-_TEXT_ASSISTANT_AUDIO = """## Как проверить аудио
-
-Прикрепите **один** файл WAV, MP3 или OGG к сообщению и выберите
-**MTBank Attachment Probe**. Результат включает transcript с timestamps,
-роли `Оператор` / `Клиент`, classification, quality checklist, compliance,
-summary и action items."""
-_TEXT_ASSISTANT_API = """## REST API
-
-`POST /analyze` принимает один multipart `file` или JSON с `url` и требует
-Bearer API key. Дополнительно доступны `POST /trends` и `WSS /ws/transcribe`.
-Полный contract находится в `docs/api.md` репозитория."""
-_TEXT_ASSISTANT_OBSERVABILITY = """## Grafana и Trends
-
-Grafana `/grafana/` показывает Calls, Quality total, Top topics, stage latency,
-errors и agent tokens. `POST /trends` анализирует несколько сохранённых звонков
-и формирует evidence-backed patterns и recommendations."""
-_TEXT_ASSISTANT_STREAMING = """## Streaming
-
-`WSS /ws/transcribe` принимает audio frames и возвращает provisional transcript
-updates. После завершения аудио система выполняет canonical reconciliation
-и полный анализ четырьмя агентами."""
 _MARKDOWN_FILENAME_TRANSLATION = str.maketrans(
     {
         "\\": "&#92;",
@@ -387,10 +352,10 @@ class ApiAssistantClient:
             with self._opener(request, timeout=self._timeout_seconds) as response:
                 parsed = _read_json_response(response)
         except (HTTPError, URLError, OSError, TrustedHttpError, UnicodeDecodeError, ValueError):
-            return _render_text_assistant(message)
+            return _TEXT_ASSISTANT_UNAVAILABLE_MESSAGE
         answer = parsed.get("answer") if isinstance(parsed, Mapping) else None
         if not isinstance(answer, str) or not answer.strip() or len(answer) > 8_000:
-            return _render_text_assistant(message)
+            return _TEXT_ASSISTANT_UNAVAILABLE_MESSAGE
         return answer.strip()
 
 
@@ -864,19 +829,6 @@ def _bounded_assistant_history(messages: list[dict[str, Any]]) -> list[dict[str,
         if normalized:
             bounded.append({"role": role, "content": normalized})
     return bounded
-
-
-def _render_text_assistant(user_message: str) -> str:
-    normalized = " ".join(user_message.casefold().split())[:512]
-    if any(token in normalized for token in ("api", "rest", "curl", "endpoint")):
-        return _TEXT_ASSISTANT_API
-    if any(token in normalized for token in ("grafana", "метрик", "дашборд", "trend", "тренд")):
-        return _TEXT_ASSISTANT_OBSERVABILITY
-    if any(token in normalized for token in ("websocket", "stream", "стрим", "real-time", "реальном времени")):
-        return _TEXT_ASSISTANT_STREAMING
-    if any(token in normalized for token in ("файл", "аудио", "wav", "mp3", "ogg", "формат")):
-        return _TEXT_ASSISTANT_AUDIO
-    return _TEXT_ASSISTANT_OVERVIEW
 
 
 def _controlled_analysis_error(display_name: str, error: Exception) -> str:

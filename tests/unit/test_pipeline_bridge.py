@@ -269,7 +269,7 @@ def test_single_pipeline_inlet_overwrites_client_mtbank_fields(monkeypatch: pyte
     assert verified.file_id == FILE_ID
 
 
-def test_inlet_routes_text_only_messages_to_deterministic_assistant(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_inlet_routes_text_only_messages_to_llm_assistant(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MTBANK_ATTACHMENT_SIGNING_KEY", SIGNING_KEY)
     pipeline = MainPipeline()
 
@@ -611,7 +611,7 @@ def test_main_pipeline_text_assistant_calls_llm_with_bounded_sanitized_history()
     assert _FakeFileClient.instances == []
 
 
-def test_api_assistant_client_falls_back_when_provider_is_unavailable() -> None:
+def test_api_assistant_client_returns_only_unavailable_error_when_provider_fails() -> None:
     def unavailable(request: object, *, timeout: float) -> object:
         del request, timeout
         raise OSError("provider unavailable")
@@ -623,8 +623,9 @@ def test_api_assistant_client_falls_back_when_provider_is_unavailable() -> None:
         opener=unavailable,
     )
 
-    assert "Быстрый сценарий" in client.answer("Привет", [])
-    assert "POST /analyze" in client.answer("Как проверить API?", [])
+    unavailable_message = "Текстовый помощник временно недоступен. Повторите запрос позже."
+    assert client.answer("Привет", []) == unavailable_message
+    assert client.answer("Как проверить API?", []) == unavailable_message
 
 
 def test_main_pipeline_keeps_controlled_errors_for_invalid_attachments() -> None:
