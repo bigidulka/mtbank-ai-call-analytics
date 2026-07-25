@@ -202,6 +202,16 @@ def _error(response: httpx.Response) -> dict[str, object]:
     return payload["error"]
 
 
+def test_runtime_binding_is_bearer_protected_and_fails_closed_without_remote_speech() -> None:
+    async def scenario() -> None:
+        app = create_app(settings=_settings(), analyzer=StubAnalyzer(), readiness=Ready())
+
+        assert (await _request(app, "GET", "/v1/benchmark-runtime-binding")).status_code == 401
+        assert (await _request(app, "GET", "/v1/benchmark-runtime-binding", headers=_auth())).status_code == 503
+
+    asyncio.run(scenario())
+
+
 def test_health_and_openapi_are_public_but_analyze_requires_bearer_auth() -> None:
     async def scenario() -> None:
         app = create_app(settings=_settings(), analyzer=StubAnalyzer(), readiness=Ready())
@@ -450,8 +460,6 @@ def test_openapi_is_exact_for_media_types_bearer_security_and_public_response() 
         assert operation["responses"]["200"]["content"]["application/json"]["schema"]["$ref"].endswith(
             "/AnalyzeResponse"
         )
-        assert operation["responses"]["401"]["content"]["application/json"]["schema"]["$ref"].endswith(
-            "/ErrorResponse"
-        )
+        assert operation["responses"]["401"]["content"]["application/json"]["schema"]["$ref"].endswith("/ErrorResponse")
 
     asyncio.run(scenario())

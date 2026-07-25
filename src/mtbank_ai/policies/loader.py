@@ -203,9 +203,7 @@ class RoleSignals(StrictFrozenModel):
             identifiers = tuple(signal.id for signal in signals)
             if len(set(identifiers)) != len(identifiers):
                 raise ValueError("role signal IDs должны быть уникальны внутри роли")
-            normalized_phrases.extend(
-                _normalize_role_phrase(phrase) for signal in signals for phrase in signal.phrases
-            )
+            normalized_phrases.extend(_normalize_role_phrase(phrase) for signal in signals for phrase in signal.phrases)
         if len(set(normalized_phrases)) != len(normalized_phrases):
             raise ValueError("role signal phrases должны быть уникальны внутри и между ролями")
         return self

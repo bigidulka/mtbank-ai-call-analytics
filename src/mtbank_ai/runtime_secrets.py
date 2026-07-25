@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 
 RUNTIME_SECRET_NAMES = (
@@ -13,6 +14,7 @@ RUNTIME_SECRET_NAMES = (
     "POSTGRES_PASSWORD",
 )
 MIN_RUNTIME_SECRET_LENGTH = 32
+_ENVIRONMENT_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 _UNSAFE_EXACT_VALUES = frozenset(
     {
@@ -50,18 +52,20 @@ def require_runtime_secret(name: str, value: str | None) -> str:
     return value
 
 
+def require_environment_secret(name: str, environment: Mapping[str, str | None]) -> str:
+    """Loads a safe secret from a deliberately named environment variable."""
+
+    if not isinstance(name, str) or not _ENVIRONMENT_NAME.fullmatch(name):
+        raise SecretConfigurationError("имя переменной окружения секрета небезопасно")
+    return require_runtime_secret(name, environment.get(name))
+
+
 def validate_runtime_secrets(environment: Mapping[str, str | None]) -> None:
     """Проверяет все обязательные секреты, не раскрывая их значения."""
 
-    invalid_names = [
-        name
-        for name in RUNTIME_SECRET_NAMES
-        if not _is_safe_secret(environment.get(name))
-    ]
+    invalid_names = [name for name in RUNTIME_SECRET_NAMES if not _is_safe_secret(environment.get(name))]
     if invalid_names:
-        raise SecretConfigurationError(
-            "Небезопасные runtime-секреты: " + ", ".join(invalid_names)
-        )
+        raise SecretConfigurationError("Небезопасные runtime-секреты: " + ", ".join(invalid_names))
 
 
 def _is_safe_secret(value: str | None) -> bool:

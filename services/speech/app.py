@@ -502,22 +502,23 @@ def _matches_bearer_key(authorizations: list[str], settings: SpeechSettings) -> 
     if scheme != "Bearer" or configured_key is None or not presented_key:
         return False
     try:
-        return hmac.compare_digest(
-            presented_key.encode("ascii"), configured_key.get_secret_value().encode("ascii")
-        )
+        return hmac.compare_digest(presented_key.encode("ascii"), configured_key.get_secret_value().encode("ascii"))
     except UnicodeEncodeError:
         return False
 
 
 def _runtime_attestation(settings: SpeechSettings, runtime: SpeechRuntimePort) -> dict[str, object]:
     asr, diarization = runtime.model_revisions()
+    attestation_runtime: dict[str, object] = {
+        "device": settings.runtime.device,
+        "compute_type": settings.faster_whisper.compute_type(device=settings.runtime.device),
+        "asr": _component_attestation(asr),
+        "diarization": _component_attestation(diarization),
+    }
+    if settings.runtime.image_digest is not None:
+        attestation_runtime["image_digest"] = settings.runtime.image_digest
     return {
-        "runtime": {
-            "device": settings.runtime.device,
-            "compute_type": settings.faster_whisper.compute_type(device=settings.runtime.device),
-            "asr": _component_attestation(asr),
-            "diarization": _component_attestation(diarization),
-        }
+        "runtime": attestation_runtime,
     }
 
 

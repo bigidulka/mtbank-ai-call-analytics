@@ -281,9 +281,7 @@ def test_trusted_local_gateway_rejects_non_loopback_or_unsafe_url(base_url: str)
 
 def test_gateway_model_settings_reject_max_reasoning_effort() -> None:
     with pytest.raises(ValidationError):
-        GatewayModelSettings.model_validate(
-            {"default_model": "configured-model", "default_reasoning_effort": "max"}
-        )
+        GatewayModelSettings.model_validate({"default_model": "configured-model", "default_reasoning_effort": "max"})
 
 
 def test_settings_require_runtime_secrets_only_when_loaded_or_constructed() -> None:

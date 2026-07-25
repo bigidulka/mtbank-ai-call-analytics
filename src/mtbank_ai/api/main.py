@@ -17,6 +17,7 @@ from mtbank_ai.api.error_handlers import install_error_handlers
 from mtbank_ai.api.readiness import CompositeReadiness, SpeechHttpReadiness
 from mtbank_ai.api.routes.analyze import router as analyze_router
 from mtbank_ai.api.routes.health import router as health_router
+from mtbank_ai.api.routes.runtime_binding import router as runtime_binding_router
 from mtbank_ai.api.routes.transcribe_ws import WebSocketSessionManager
 from mtbank_ai.api.routes.transcribe_ws import router as transcribe_ws_router
 from mtbank_ai.api.routes.trends import router as trends_router
@@ -29,9 +30,11 @@ from mtbank_ai.application.ports import (
 )
 from mtbank_ai.config import Settings
 from mtbank_ai.observability import Telemetry
+from mtbank_ai.speech.client import HttpSpeechServiceClient, SpeechServiceClientSettings
 from mtbank_ai.speech.streaming import (
     InternalSpeechWebSocketAdapter,
     InternalSpeechWebSocketSettings,
+    RollingHttpSpeechAdapter,
     StreamingSpeechPort,
 )
 from mtbank_ai.storage.postgres import PostgresReadiness, create_postgres_engine
@@ -146,6 +149,7 @@ def create_app(
     install_error_handlers(app)
     app.include_router(health_router)
     app.include_router(analyze_router)
+    app.include_router(runtime_binding_router)
     app.include_router(trends_router)
     app.include_router(transcribe_ws_router)
 
@@ -164,18 +168,36 @@ def _has_complete_workflow_configuration(settings: Settings) -> bool:
 def _build_streaming_speech_adapter(settings: Settings) -> StreamingSpeechPort | None:
     speech = settings.speech
     websocket = settings.websocket
-    if not websocket.enabled or speech is None or speech.mode != "internal_http":
+    if not websocket.enabled or speech is None:
         return None
-    return InternalSpeechWebSocketAdapter(
-        InternalSpeechWebSocketSettings(
-            base_url=str(speech.base_url),
-            stream_path=speech.streaming_path,
-            open_timeout_seconds=min(websocket.processing_timeout_seconds, speech.timeout_seconds),
-            ping_interval_seconds=min(20.0, websocket.max_duration_seconds),
-            ping_timeout_seconds=websocket.processing_timeout_seconds,
-            close_timeout_seconds=1.0,
-            max_message_bytes=websocket.max_frame_bytes + 4,
-        )
+    common = {
+        "base_url": str(speech.base_url),
+        "stream_path": speech.streaming_path,
+        "open_timeout_seconds": min(websocket.processing_timeout_seconds, speech.timeout_seconds),
+        "ping_interval_seconds": min(20.0, websocket.max_duration_seconds),
+        "ping_timeout_seconds": websocket.processing_timeout_seconds,
+        "close_timeout_seconds": 1.0,
+        "max_message_bytes": websocket.max_frame_bytes + 4,
+    }
+    if speech.mode == "internal_http":
+        return InternalSpeechWebSocketAdapter(InternalSpeechWebSocketSettings(**common))
+    if speech.api_key is None:
+        raise RuntimeError("remote speech configuration requires an API key")
+    return RollingHttpSpeechAdapter(
+        HttpSpeechServiceClient(
+            SpeechServiceClientSettings(
+                mode=speech.mode,
+                base_url=speech.base_url,
+                api_key=speech.api_key,
+                transcription_path=speech.transcription_path,
+                timeout_seconds=speech.timeout_seconds,
+                max_success_response_bytes=speech.max_success_response_bytes,
+                max_error_response_bytes=speech.max_error_response_bytes,
+            )
+        ),
+        window_seconds=websocket.rolling_window_seconds,
+        step_seconds=websocket.rolling_step_seconds,
+        request_timeout_seconds=websocket.rolling_request_timeout_seconds,
     )
 
 

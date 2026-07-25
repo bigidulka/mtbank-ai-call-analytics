@@ -94,9 +94,7 @@ def test_trusted_opener_ignores_proxy_for_credentialed_request(monkeypatch: pyte
             assert response.status == 200
 
         assert proxy.records == []
-        assert target.records == [
-            ("/signin", "Bearer test-admin-jwt", b'{"password":"test-admin-password"}')
-        ]
+        assert target.records == [("/signin", "Bearer test-admin-jwt", b'{"password":"test-admin-password"}')]
 
 
 def test_pipeline_client_fails_closed_on_redirect_without_credential_egress(

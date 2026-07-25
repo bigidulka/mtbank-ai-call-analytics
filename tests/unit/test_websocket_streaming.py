@@ -40,6 +40,18 @@ class _StreamingPort:
         return _StreamingSession()
 
 
+class _NoUpdateSession(_StreamingSession):
+    async def push(self, frame: bytes, *, sequence: int) -> tuple[StreamingUpdate, ...]:
+        assert frame == b"pcm0" and sequence == 1
+        return ()
+
+
+class _NoUpdateStreamingPort:
+    async def open(self, start: StreamingStart) -> _NoUpdateSession:
+        assert start.codec == "pcm_s16le"
+        return _NoUpdateSession()
+
+
 class _BlockingCloseSession(_StreamingSession):
     async def close(self) -> None:
         await asyncio.Event().wait()
@@ -93,12 +105,37 @@ def test_websocket_emits_partial_before_end_and_reconciles_canonical_batch() -> 
         assert websocket.receive_json()["type"] == "started"
         websocket.send_json({"type": "audio", "sequence": 1, "data": base64.b64encode(b"pcm0").decode("ascii")})
         assert websocket.receive_json()["type"] == "partial"
+        assert websocket.receive_json() == {"type": "ack", "sequence": 1}
         websocket.send_json({"type": "end", "sequence": 2})
         assert websocket.receive_json()["type"] == "provisional_final"
         assert websocket.receive_json()["type"] == "reconciled"
 
     assert analyzer.sources[0].content.endswith(b"pcm0")
     assert analyzer.sources[0].content.startswith(b"RIFF")
+
+
+def test_websocket_acks_accepted_frame_without_provisional_update() -> None:
+    settings = Settings(
+        environment="test",
+        api=ApiSettings(api_key=SecretStr(_KEY)),
+        database=DatabaseSettings(password=SecretStr("opaque-database-password")),
+        websocket=WebSocketSettings(enabled=True, allowed_origins=("https://test.example",)),
+    )
+    app = create_app(
+        settings=settings,
+        analyzer=cast(AnalyzeCallPort, _Analyzer()),
+        readiness=_Ready(),
+        streaming_speech=_NoUpdateStreamingPort(),
+    )
+    with TestClient(app).websocket_connect(
+        "/ws/transcribe", headers={"Authorization": f"Bearer {_KEY}", "Origin": "https://test.example"}
+    ) as websocket:
+        websocket.send_json(
+            {"type": "start", "sequence": 0, "codec": "pcm_s16le", "sample_rate_hz": 16000, "channels": 1}
+        )
+        assert websocket.receive_json() == {"type": "started", "sequence": 0}
+        websocket.send_json({"type": "audio", "sequence": 1, "data": base64.b64encode(b"pcm0").decode("ascii")})
+        assert websocket.receive_json() == {"type": "ack", "sequence": 1}
 
 
 def _timeout_settings() -> Settings:
@@ -148,6 +185,7 @@ def test_deadline_releases_slot_before_blocking_analyze_and_close() -> None:
             assert websocket.receive_json()["type"] == "started"
             websocket.send_json({"type": "audio", "sequence": 1, "data": base64.b64encode(b"pcm0").decode("ascii")})
             assert websocket.receive_json()["type"] == "partial"
+            assert websocket.receive_json() == {"type": "ack", "sequence": 1}
             websocket.send_json({"type": "end", "sequence": 2})
             assert websocket.receive_json()["type"] == "provisional_final"
             assert websocket.receive_json() == {"type": "timeout"}

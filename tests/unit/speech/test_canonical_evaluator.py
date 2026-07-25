@@ -6,6 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+import mtbank_ai.public_endpoint as public_endpoint
 import scripts.evaluate_canonical_speech as canonical_evaluator
 from mtbank_ai.speech.dataset import ManifestEntry
 from scripts.evaluate_canonical_speech import CanonicalEvaluationFailure, _endpoint, _evaluate_entry
@@ -48,6 +49,36 @@ def test_canonical_evaluator_rejects_noncanonical_base_url(base_url: str) -> Non
         _endpoint(base_url)
 
 
+def test_canonical_evaluator_bearer_mode_requires_safe_https_and_one_header(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    key = "N7!qR2@vL9#sX4$kM8%tY1^cD6&hJ3*F"
+    monkeypatch.setenv("CANONICAL_TEST_KEY", key)
+    monkeypatch.setattr(
+        public_endpoint.socket,
+        "getaddrinfo",
+        lambda _host, port, **_kwargs: [(2, 1, 6, "", ("8.8.8.8", port))],
+    )
+    headers = canonical_evaluator._bearer_headers("CANONICAL_TEST_KEY")
+    assert headers == {"Authorization": f"Bearer {key}"}
+    assert canonical_evaluator._endpoint("https://speech.test", bearer=True) == "https://speech.test/v1/transcribe"
+    for unsafe in ("http://speech.test", "https://key@speech.test", "https://speech.test?x=1"):
+        with pytest.raises(ValueError) as error:
+            canonical_evaluator._endpoint(unsafe, bearer=True)
+        assert key not in str(error.value)
+
+    captured: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(502)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(CanonicalEvaluationFailure):
+            _evaluate_entry(client, "https://speech.test/v1/transcribe", _entry(tmp_path), headers)
+    assert captured[0].headers.get_list("authorization") == [f"Bearer {key}"]
+
+
 def test_canonical_evaluator_disables_environment_proxies(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     manifest = tmp_path / "manifest.yaml"
     manifest.write_text("fixtures: []\n", encoding="utf-8")
@@ -73,6 +104,22 @@ def test_canonical_evaluator_disables_environment_proxies(tmp_path: Path, monkey
     assert status == 0
     assert result["status"] == "completed"
     assert client_options == {"timeout": 12.5, "follow_redirects": False, "trust_env": False}
+
+
+def test_canonical_evaluator_retries_transient_service_failure(tmp_path: Path) -> None:
+    responses = iter((httpx.Response(500), httpx.Response(502)))
+    transport = httpx.MockTransport(lambda _request: next(responses))
+    with httpx.Client(transport=transport) as client:
+        with pytest.raises(CanonicalEvaluationFailure, match="provider_failure") as error:
+            _evaluate_entry(
+                client,
+                "http://speech.test/v1/transcribe",
+                _entry(tmp_path),
+                transient_retries=1,
+                retry_delay_seconds=0,
+            )
+
+    assert error.value.status_code == 502
 
 
 def test_canonical_evaluator_reports_role_resolution_failure_without_parsing_body(tmp_path: Path) -> None:

@@ -20,9 +20,7 @@ def test_speech_readiness_uses_bounded_direct_http_client_without_reading_body()
 
         transport = httpx.MockTransport(handler)
 
-        def client_factory(
-            *, timeout: httpx.Timeout, trust_env: bool, follow_redirects: bool
-        ) -> httpx.AsyncClient:
+        def client_factory(*, timeout: httpx.Timeout, trust_env: bool, follow_redirects: bool) -> httpx.AsyncClient:
             captured.update(
                 timeout=timeout,
                 trust_env=trust_env,
@@ -106,9 +104,7 @@ def test_speech_readiness_uses_bearer_only_for_remote_https() -> None:
             assert request.headers["authorization"] == "Bearer opaque-remote-speech-key"
             return httpx.Response(200)
 
-        def client_factory(
-            *, timeout: httpx.Timeout, trust_env: bool, follow_redirects: bool
-        ) -> httpx.AsyncClient:
+        def client_factory(*, timeout: httpx.Timeout, trust_env: bool, follow_redirects: bool) -> httpx.AsyncClient:
             return httpx.AsyncClient(
                 transport=httpx.MockTransport(handler),
                 timeout=timeout,

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "kind": "websocket-streaming-diagnostic",
+  "diagnostic_only": true,
+  "evidence_eligible_for_gpu_gate": false,
+  "route_sha256": "06942a480611398d07c34aa2a29fcaff53aa71c3c6cef800ee26c31ead443e26",
+  "audio_sha256": "26c0b4bf57714dac4c6956e154352612b781d3e5eb8a2d9e1c3fc53ca759672c",
+  "audio_seconds": 30.0,
+  "frame_seconds": 0.5,
+  "frames_sent": 60,
+  "updates": [
+    {
+      "sequence": 24,
+      "kind": "partial",
+      "latency_ms": 1428.098,
+      "text_sha256": "d71d2526306834d4aab9b5c5f090f983b471e03a783fc3528de4511017a10331",
+      "text_bytes": 253
+    }
+  ],
+  "p50_ms": 1428.098,
+  "p95_ms": 1428.098,
+  "max_ms": 1428.098,
+  "reconciliation_ms": 18416.464,
+  "session_count": 1,
+  "wall_latency_ms": 50504.126
+}

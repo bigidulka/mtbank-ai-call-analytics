@@ -30,8 +30,11 @@ def test_ci_has_offline_real_and_gpu_release_jobs() -> None:
     assert "workflow_dispatch:" in gpu
     assert "self-hosted" in gpu
     assert "run_gpu_speech_benchmark.py" in gpu
-    assert "docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile gpu build speech" in gpu
-    assert "docker image inspect" in gpu
+    assert "MTBANK_GPU_BENCHMARK_RUNTIME_URL" not in gpu
+    binding_route = ROOT / "src" / "mtbank_ai" / "api" / "routes" / "runtime_binding.py"
+    assert "benchmark-runtime-binding" in binding_route.read_text(encoding="utf-8")
+    assert "MTBANK_GPU_BENCHMARK_IMAGE_DIGEST" in gpu
+    assert "docker image inspect" not in gpu
     assert "Validate generated GPU evidence for this checkout" in gpu
     assert "websocket-gpu-p95.json" in gpu
     assert "pytest -m gpu" in gpu
@@ -46,16 +49,16 @@ def test_core_public_docs_remain_available() -> None:
     assert "CLIProxyAPI" not in readme
 
 
-def test_readme_discloses_local_asr_and_uncollected_runtime_evidence() -> None:
+def test_readme_discloses_local_asr_and_collected_runtime_evidence() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
     for value in (
         "local `faster-whisper` `large-v3-turbo`",
         "local pyannote Community-1",
-        "Opt-in WebSocket provisional mode",
-        "Canonical corpus-wide WER/DER/role metrics",
-        "GPU WebSocket p95",
-        "SLA `<60 с` не выполнен",
+        "Micro aggregate",
+        "35.979 с",
+        "1428.098 мс",
+        "release-evidence/final-115",
     ):
         assert value in readme
     assert "dropbox-dash/faster-whisper-large-v3-turbo" not in readme

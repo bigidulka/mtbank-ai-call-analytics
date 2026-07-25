@@ -132,13 +132,7 @@ def _validate_speech_base_url(value: HttpUrl, mode: SpeechTransportMode) -> Http
         parts.port
     except ValueError:
         raise ValueError("speech base_url имеет некорректную authority") from None
-    if (
-        not parts.hostname
-        or parts.username is not None
-        or parts.password is not None
-        or parts.query
-        or parts.fragment
-    ):
+    if not parts.hostname or parts.username is not None or parts.password is not None or parts.query or parts.fragment:
         raise ValueError("speech base_url не может содержать credentials, query или fragment")
     if mode == "internal_http":
         if parts.scheme != "http" or not (
@@ -366,7 +360,18 @@ class WebSocketSettings(StrictFrozenModel):
     max_update_text_bytes: PositiveInt = 48 * 1024
     max_duration_seconds: PositiveFloat = 300.0
     max_sessions: PositiveInt = 4
-    processing_timeout_seconds: PositiveFloat = 2.0
+    processing_timeout_seconds: PositiveFloat = 3.0
+    rolling_window_seconds: PositiveFloat = 12.0
+    rolling_step_seconds: PositiveFloat = 1.5
+    rolling_request_timeout_seconds: PositiveFloat = 3.0
+
+    @model_validator(mode="after")
+    def validate_rolling_limits(self) -> Self:
+        if self.rolling_step_seconds > self.rolling_window_seconds:
+            raise ValueError("rolling_step_seconds не может превышать rolling_window_seconds")
+        if self.rolling_request_timeout_seconds > self.processing_timeout_seconds:
+            raise ValueError("rolling request timeout не может превышать processing timeout")
+        return self
 
     @field_validator("allowed_origins", mode="before")
     @classmethod

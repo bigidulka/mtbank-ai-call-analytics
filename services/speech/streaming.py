@@ -552,11 +552,7 @@ class RollingStreamingSession:
 
     async def _rolling_update(self, sequence: int) -> tuple[StreamingUpdate, ...]:
         pcm = bytes(self._speech_ring)
-        if (
-            self._rolling_exhausted
-            or not pcm
-            or not _has_pcm_energy(pcm, self._pcm_energy_threshold)
-        ):
+        if self._rolling_exhausted or not pcm or not _has_pcm_energy(pcm, self._pcm_energy_threshold):
             return ()
         duration_seconds = len(pcm) / _PCM_BYTES_PER_SECOND
         if (

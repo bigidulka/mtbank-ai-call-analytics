@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "public-analyze-five-minute-sla",
+  "source_sha256": "a44a6a2e22907a1070cc8c0552c6f2871e82141c6c993601fa79b129361f15cd",
+  "workload_sha256": "de4970b4366408730500377bbc3f8a71e467e591c0f0a0b2509cf223277da344",
+  "audio_seconds": 300.0,
+  "endpoint_sha256": "7696cd60a6366ba201388929987b6c697222dd9c9ee1fc5adb19775fc02a8cab",
+  "status_code": 200,
+  "latency_ms": 35979.46,
+  "status": "completed",
+  "component_metadata": {
+    "code_sha": "df6e1e79dd2192cf399ce83cd234c8ea54c40860-dirty",
+    "asr": {
+      "model_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+    },
+    "diarization": {
+      "model_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee"
+    }
+  }
+}

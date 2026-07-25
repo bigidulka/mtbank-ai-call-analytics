@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -34,6 +35,8 @@ else:
         speaker_attributed_wer,
         time_weighted_role_accuracy,
     )
+from mtbank_ai.public_endpoint import PublicEndpointError, require_public_dns_host
+from mtbank_ai.runtime_secrets import SecretConfigurationError, require_environment_secret
 from mtbank_ai.speech.contracts import SpeechTranscriptionResponse
 from mtbank_ai.speech.dataset import ManifestEntry, validate_manifest
 
@@ -55,13 +58,37 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _endpoint(base_url: str) -> str:
+def _endpoint(base_url: str, *, bearer: bool = False) -> str:
     parsed = urlsplit(base_url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc or parsed.query or parsed.fragment:
-        raise ValueError("canonical base URL должен быть абсолютным HTTP(S) URL без query/fragment")
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("canonical base URL должен быть абсолютным HTTP(S) URL без credentials/query/fragment")
+    if bearer and parsed.scheme != "https":
+        raise ValueError("bearer canonical base URL должен использовать HTTPS")
     if parsed.path not in {"", "/"}:
         raise ValueError("canonical base URL не должен содержать path")
+    if bearer:
+        try:
+            require_public_dns_host(parsed.hostname or "", parsed.port or 443)
+        except PublicEndpointError as error:
+            raise ValueError(str(error)) from error
     return f"{base_url.rstrip('/')}/v1/transcribe"
+
+
+def _bearer_headers(api_key_env: str | None) -> dict[str, str] | None:
+    if api_key_env is None:
+        return None
+    try:
+        api_key = require_environment_secret(api_key_env, os.environ)
+    except SecretConfigurationError as error:
+        raise ValueError(str(error)) from error
+    return {"Authorization": f"Bearer {api_key}"}
 
 
 def _segments(response: SpeechTranscriptionResponse) -> tuple[Segment, ...]:
@@ -154,14 +181,29 @@ def _counts_from_json(value: dict[str, object]) -> ErrorCounts:
     )
 
 
-def _evaluate_entry(client: httpx.Client, endpoint: str, entry: ManifestEntry) -> dict[str, object]:
+def _evaluate_entry(
+    client: httpx.Client,
+    endpoint: str,
+    entry: ManifestEntry,
+    headers: dict[str, str] | None = None,
+    *,
+    transient_retries: int = 0,
+    retry_delay_seconds: float = 1.0,
+) -> dict[str, object]:
     content_type = _CONTENT_TYPES[entry.raw["format"]]
     started = time.monotonic()
-    with entry.path.open("rb") as audio:
-        response = client.post(
-            endpoint,
-            files={"file": (entry.path.name, audio, content_type)},
-        )
+    response: httpx.Response | None = None
+    for attempt in range(transient_retries + 1):
+        with entry.path.open("rb") as audio:
+            response = client.post(
+                endpoint,
+                files={"file": (entry.path.name, audio, content_type)},
+                headers=headers,
+            )
+        if response.status_code not in {429, 500, 503, 504} or attempt == transient_retries:
+            break
+        time.sleep(retry_delay_seconds * (attempt + 1))
+    assert response is not None
     latency_ms = round((time.monotonic() - started) * 1000, 3)
     if response.status_code == 502:
         raise CanonicalEvaluationFailure(status_code=502, reason="provider_failure")
@@ -200,13 +242,24 @@ def _evaluate_entry(client: httpx.Client, endpoint: str, entry: ManifestEntry) -
 
 def evaluate(arguments: argparse.Namespace) -> tuple[int, dict[str, object]]:
     entries = validate_manifest(arguments.manifest, require_release_corpus=True)
-    endpoint = _endpoint(arguments.base_url)
+    api_key_env = getattr(arguments, "api_key_env", None)
+    endpoint = _endpoint(arguments.base_url, bearer=api_key_env is not None)
+    headers = _bearer_headers(api_key_env)
     scored_entries = tuple(entry for entry in entries if entry.kind == "speech_reference")
     results: list[dict[str, object]] = []
     with httpx.Client(timeout=arguments.timeout_seconds, follow_redirects=False, trust_env=False) as client:
         for entry in scored_entries:
             try:
-                results.append(_evaluate_entry(client, endpoint, entry))
+                results.append(
+                    _evaluate_entry(
+                        client,
+                        endpoint,
+                        entry,
+                        headers,
+                        transient_retries=arguments.transient_retries,
+                        retry_delay_seconds=arguments.retry_delay_seconds,
+                    )
+                )
             except CanonicalEvaluationFailure as error:
                 return 1, {
                     "schema_version": 1,
@@ -234,11 +287,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=Path("test_data/manifest.yaml"))
     parser.add_argument("--base-url", required=True)
+    parser.add_argument("--api-key-env", help="имя переменной окружения bearer key для remote HTTPS")
     parser.add_argument("--timeout-seconds", type=float, default=180.0)
+    parser.add_argument("--transient-retries", type=int, default=2)
+    parser.add_argument("--retry-delay-seconds", type=float, default=1.0)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
-    if arguments.timeout_seconds <= 0:
-        parser.error("--timeout-seconds должен быть положительным")
+    if arguments.timeout_seconds <= 0 or arguments.transient_retries < 0 or arguments.retry_delay_seconds < 0:
+        parser.error("timeout/retry limits должны быть неотрицательными, timeout — положительным")
     status, result = evaluate(arguments)
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

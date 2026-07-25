@@ -18,9 +18,7 @@ def test_model_sources_require_pinned_local_asr_and_community_one() -> None:
     asr = sources.sources["asr"]
     assert asr.model_id == "dropbox-dash/faster-whisper-large-v3-turbo"
     assert asr.package.name == "faster-whisper"
-    assert asr.expected_artifact_content_sha256 == (
-        "2dc8cda8797a061fbf98fcc8243d11e77af826b3ec04b9f6a259af976a1dfdc8"
-    )
+    assert asr.expected_artifact_content_sha256 == ("2dc8cda8797a061fbf98fcc8243d11e77af826b3ec04b9f6a259af976a1dfdc8")
     assert asr.gated is False
     source = sources.sources["diarization"]
     assert source.repo_id == "pyannote/speaker-diarization-community-1"
@@ -32,9 +30,7 @@ def test_model_sources_require_pinned_local_asr_and_community_one() -> None:
 
 
 def test_provisioning_fails_closed_before_hub_access_without_reviewed_diarization_digest(tmp_path: Path) -> None:
-    source_payload = json.loads(
-        (ROOT / "services" / "speech" / "model-sources.json").read_text(encoding="utf-8")
-    )
+    source_payload = json.loads((ROOT / "services" / "speech" / "model-sources.json").read_text(encoding="utf-8"))
     source_payload["sources"]["diarization"]["expected_artifact_content_sha256"] = None
     source_path = tmp_path / "model-sources.json"
     source_path.write_text(json.dumps(source_payload), encoding="utf-8")

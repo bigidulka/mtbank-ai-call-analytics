@@ -111,14 +111,12 @@ class PolicyRoleResolver:
         second_scores = self._scores(second)
         operator_first_total = first_scores.operator.value + second_scores.client.value
         client_first_total = first_scores.client.value + second_scores.operator.value
-        operator_first_valid = (
-            first_scores.operator.value >= self._minimum_score(SpeakerRole.OPERATOR)
-            and second_scores.client.value >= self._minimum_score(SpeakerRole.CLIENT)
-        )
-        client_first_valid = (
-            first_scores.client.value >= self._minimum_score(SpeakerRole.CLIENT)
-            and second_scores.operator.value >= self._minimum_score(SpeakerRole.OPERATOR)
-        )
+        operator_first_valid = first_scores.operator.value >= self._minimum_score(
+            SpeakerRole.OPERATOR
+        ) and second_scores.client.value >= self._minimum_score(SpeakerRole.CLIENT)
+        client_first_valid = first_scores.client.value >= self._minimum_score(
+            SpeakerRole.CLIENT
+        ) and second_scores.operator.value >= self._minimum_score(SpeakerRole.OPERATOR)
         if not operator_first_valid and not client_first_valid:
             return ()
         margin = abs(operator_first_total - client_first_total)

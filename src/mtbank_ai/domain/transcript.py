@@ -182,10 +182,7 @@ class TranscriptSnapshot(StrictFrozenModel):
             previous_start = segment.start
             previous_end = segment.end
 
-        assignments = {
-            assignment.original_speaker_id: assignment
-            for assignment in self.role_resolution.assignments
-        }
+        assignments = {assignment.original_speaker_id: assignment for assignment in self.role_resolution.assignments}
         segment_speaker_ids = {segment.original_speaker_id for segment in self.segments}
         if set(assignments) != segment_speaker_ids:
             raise ValueError("role resolution должен покрывать все original speaker IDs")

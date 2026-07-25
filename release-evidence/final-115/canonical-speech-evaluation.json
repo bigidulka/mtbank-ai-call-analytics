@@ -1,0 +1,309 @@
+{
+  "schema_version": 1,
+  "kind": "canonical-speech-evaluation",
+  "canonical_speech_path": true,
+  "status": "completed",
+  "manifest_sha256": "a520a33d5df53ccd96c2998586711bc865d644492e37d93eb0bfc6f23bc9df08",
+  "endpoint_sha256": "4b47f9a2f479a3903064780be46af495c26814e823acaa18b4b0dedde3323ea6",
+  "files": [
+    {
+      "id": "synthetic-credit-consultation",
+      "audio_sha256": "a44a6a2e22907a1070cc8c0552c6f2871e82141c6c993601fa79b129361f15cd",
+      "reference_sha256": "f7220b6951c586af6a7a7bdd2c72470a5a8de2285cdfdb7f4f1249d019320f52",
+      "hypothesis_sha256": "84fcd0f898251befcf14673c8b2021d55d227fda175041d22af090c3606c5088",
+      "transcript_revision": "speech/local-faster-whisper-v1",
+      "component_revisions": {
+        "asr": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "alignment": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "native-word-timestamps-v1",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "diarization": {
+          "package": "pyannote.audio",
+          "package_version": "4.0.7",
+          "model_id": "pyannote/speaker-diarization-community-1",
+          "model_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+          "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
+        }
+      },
+      "latency_ms": 9796.685,
+      "metrics": {
+        "wer": {
+          "wer": 0.08888888888888889,
+          "substitutions": 9,
+          "deletions": 13,
+          "insertions": 10,
+          "reference_words": 360
+        },
+        "der": {
+          "der": 0.19110482696830522,
+          "miss_seconds": 30.591999999999956,
+          "false_alarm_seconds": 7.096999999999973,
+          "confusion_seconds": 3.26400000000001,
+          "reference_speaker_seconds": 214.29600000000002
+        },
+        "time_weighted_role_accuracy": 0.8420129167133314,
+        "speaker_attributed_wer": {
+          "wer": 0.08888888888888889,
+          "substitutions": 9,
+          "deletions": 13,
+          "insertions": 10,
+          "reference_words": 360
+        }
+      }
+    },
+    {
+      "id": "synthetic-card-complaint-telephone",
+      "audio_sha256": "ad29510b4c11f5f633580fe14313748da29b315f029c5d738fb4f1ef4f119a6d",
+      "reference_sha256": "e9f440ccd7a49550ea36af4046107613694ab0f27e6b44751b28d87cfabbe9a9",
+      "hypothesis_sha256": "80cc993745403f18dc6a98825361a427182c5a298976dc30767a6af547e732b3",
+      "transcript_revision": "speech/local-faster-whisper-v1",
+      "component_revisions": {
+        "asr": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "alignment": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "native-word-timestamps-v1",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "diarization": {
+          "package": "pyannote.audio",
+          "package_version": "4.0.7",
+          "model_id": "pyannote/speaker-diarization-community-1",
+          "model_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+          "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
+        }
+      },
+      "latency_ms": 4360.902,
+      "metrics": {
+        "wer": {
+          "wer": 0.05263157894736842,
+          "substitutions": 6,
+          "deletions": 0,
+          "insertions": 3,
+          "reference_words": 171
+        },
+        "der": {
+          "der": 0.1994894860699913,
+          "miss_seconds": 14.615999999999982,
+          "false_alarm_seconds": 5.152999999999977,
+          "confusion_seconds": 1.2540000000000049,
+          "reference_speaker_seconds": 105.384
+        },
+        "time_weighted_role_accuracy": 0.8494078797540424,
+        "speaker_attributed_wer": {
+          "wer": 0.05263157894736842,
+          "substitutions": 6,
+          "deletions": 0,
+          "insertions": 3,
+          "reference_words": 171
+        }
+      }
+    },
+    {
+      "id": "synthetic-transfer-question",
+      "audio_sha256": "432af16dd0b983ced38020847faa6b5cca4228c62c1a3e3bba7cba81b409ad5c",
+      "reference_sha256": "166e21441c0c0c8f77d3aca5da95af809b2dcdcb1cdf0a1cc1ab19c3185ada54",
+      "hypothesis_sha256": "0564be9472e50c5ac6079d5bf9d00ec7d2815498202c4f50b48ebecce8f0f779",
+      "transcript_revision": "speech/local-faster-whisper-v1",
+      "component_revisions": {
+        "asr": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "alignment": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "native-word-timestamps-v1",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "diarization": {
+          "package": "pyannote.audio",
+          "package_version": "4.0.7",
+          "model_id": "pyannote/speaker-diarization-community-1",
+          "model_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+          "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
+        }
+      },
+      "latency_ms": 3893.39,
+      "metrics": {
+        "wer": {
+          "wer": 0.06097560975609756,
+          "substitutions": 6,
+          "deletions": 0,
+          "insertions": 4,
+          "reference_words": 164
+        },
+        "der": {
+          "der": 0.20970238095238103,
+          "miss_seconds": 14.74799999999998,
+          "false_alarm_seconds": 5.2800000000000225,
+          "confusion_seconds": 1.1099999999999994,
+          "reference_speaker_seconds": 100.79999999999997
+        },
+        "time_weighted_role_accuracy": 0.8426785714285717,
+        "speaker_attributed_wer": {
+          "wer": 0.06097560975609756,
+          "substitutions": 6,
+          "deletions": 0,
+          "insertions": 4,
+          "reference_words": 164
+        }
+      }
+    },
+    {
+      "id": "synthetic-mobile-app-security",
+      "audio_sha256": "0a6d1cae8fbc5467e95e478d13eeed873cf0c7d121095e64c6227adffff534ef",
+      "reference_sha256": "3431cf137087106ae504bfe2903be0601d0d9b9071bdd4a6108b2f6083379406",
+      "hypothesis_sha256": "fd6737322dfdcf5d004c238f33d30100e47b8def797ec3bc6aa5dccedf8bf01e",
+      "transcript_revision": "speech/local-faster-whisper-v1",
+      "component_revisions": {
+        "asr": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "alignment": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "native-word-timestamps-v1",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "diarization": {
+          "package": "pyannote.audio",
+          "package_version": "4.0.7",
+          "model_id": "pyannote/speaker-diarization-community-1",
+          "model_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+          "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
+        }
+      },
+      "latency_ms": 4096.921,
+      "metrics": {
+        "wer": {
+          "wer": 0.04819277108433735,
+          "substitutions": 4,
+          "deletions": 0,
+          "insertions": 4,
+          "reference_words": 166
+        },
+        "der": {
+          "der": 0.21290244492858887,
+          "miss_seconds": 15.089999999999995,
+          "false_alarm_seconds": 4.9480000000000075,
+          "confusion_seconds": 1.0700000000000074,
+          "reference_speaker_seconds": 99.14399999999998
+        },
+        "time_weighted_role_accuracy": 0.8370047607520374,
+        "speaker_attributed_wer": {
+          "wer": 0.04819277108433735,
+          "substitutions": 4,
+          "deletions": 0,
+          "insertions": 4,
+          "reference_words": 166
+        }
+      }
+    },
+    {
+      "id": "synthetic-deposit-consultation",
+      "audio_sha256": "868e4f24fbf6fe7603e18f8f2d10cdd552c6d8b236be8e4943d9bcf8e571147e",
+      "reference_sha256": "420a0b2971cb163ddca1415f3b706b65da843303d1706c9e523b3b88e4a75e02",
+      "hypothesis_sha256": "90d9073d654826961e9e474e18eab21177b1ee89a6386cb1615817d3b7b15791",
+      "transcript_revision": "speech/local-faster-whisper-v1",
+      "component_revisions": {
+        "asr": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "alignment": {
+          "package": "faster-whisper",
+          "package_version": "1.2.1",
+          "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+          "model_revision": "native-word-timestamps-v1",
+          "artifact_sha256": "a75f7b3f6ac60a2f6d7dbd7ad8178327f1b321444a33826a134608d9cd40f19b"
+        },
+        "diarization": {
+          "package": "pyannote.audio",
+          "package_version": "4.0.7",
+          "model_id": "pyannote/speaker-diarization-community-1",
+          "model_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+          "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
+        }
+      },
+      "latency_ms": 4942.563,
+      "metrics": {
+        "wer": {
+          "wer": 0.06285714285714286,
+          "substitutions": 6,
+          "deletions": 0,
+          "insertions": 5,
+          "reference_words": 175
+        },
+        "der": {
+          "der": 0.21668093607305958,
+          "miss_seconds": 18.38800000000002,
+          "false_alarm_seconds": 4.882000000000012,
+          "confusion_seconds": 1.0259999999999962,
+          "reference_speaker_seconds": 112.12800000000001
+        },
+        "time_weighted_role_accuracy": 0.8268585901826483,
+        "speaker_attributed_wer": {
+          "wer": 0.06285714285714286,
+          "substitutions": 6,
+          "deletions": 0,
+          "insertions": 5,
+          "reference_words": 175
+        }
+      }
+    }
+  ],
+  "micro": {
+    "wer": {
+      "wer": 0.06756756756756757,
+      "substitutions": 31,
+      "deletions": 13,
+      "insertions": 26,
+      "reference_words": 1036
+    },
+    "der": {
+      "der": 0.20343109321379269,
+      "miss_seconds": 93.43399999999993,
+      "false_alarm_seconds": 27.359999999999992,
+      "confusion_seconds": 7.724000000000018,
+      "reference_speaker_seconds": 631.752
+    },
+    "time_weighted_role_accuracy": 0.8398770403576088,
+    "speaker_attributed_wer": {
+      "wer": 0.06756756756756757,
+      "substitutions": 31,
+      "deletions": 13,
+      "insertions": 26,
+      "reference_words": 1036
+    }
+  }
+}

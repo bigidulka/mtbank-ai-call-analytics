@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 from typing import Literal, Self
 
@@ -77,6 +78,7 @@ class GroqTranscriptionSettings(StrictFrozenModel):
 
 class SpeechRuntimeSettings(StrictFrozenModel):
     device: Literal["cpu", "cuda"] = "cpu"
+    image_digest: str | None = None
     language: Literal["ru"] = "ru"
     pipeline_revision: NonEmptyId = "speech/local-faster-whisper-v1"
     role_review_confidence_threshold: Confidence = 0.75
@@ -90,6 +92,13 @@ class SpeechRuntimeSettings(StrictFrozenModel):
     max_concurrency: PositiveInt = 1
     queue_capacity: NonNegativeInt = 2
     temp_root: NonEmptyId = "/tmp/mtbank-speech"
+
+    @field_validator("image_digest")
+    @classmethod
+    def validate_image_digest(cls, value: str | None) -> str | None:
+        if value is not None and (not re.fullmatch(r"sha256:[0-9a-f]{64}", value) or value != value.strip()):
+            raise ValueError("image_digest должен быть immutable sha256 digest")
+        return value
 
 
 class SpeechStreamingSettings(StrictFrozenModel):

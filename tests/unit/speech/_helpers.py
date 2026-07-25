@@ -43,7 +43,7 @@ def make_registry(
             model_revision="test-diarization",
             relative_path="diarization",
             artifact_sha256=artifact_tree_sha256(diarization),
-        )
+        ),
     )
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(manifest.model_dump(mode="json")), encoding="utf-8")

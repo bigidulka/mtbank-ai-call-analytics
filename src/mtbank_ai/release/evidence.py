@@ -44,13 +44,24 @@ _REAL_TRACE_PROVENANCE: Final = frozenset(
 )
 _EVIDENCE_SCHEMAS: Final = {
     "licensed-corpus-manifest": (
-        frozenset({"license_document_sha256", "manifest_source_sha256", "reviewer_id_sha256", "dataset_revision"}),
+        frozenset(
+            {"license_document_sha256", "manifest_source_sha256", "reviewer_reference_sha256", "dataset_revision"}
+        ),
         frozenset({"reference_transcript_count", "role_label_count"}),
         frozenset({"dataset_id"}),
     ),
     "local-model-artifacts": (
-        frozenset({"artifact_set_sha256", "manifest_source_sha256", "model_revision", "reviewer_id_sha256"}),
-        frozenset({"artifact_count"}),
+        frozenset(
+            {
+                "manifest_sha256",
+                "asr_artifact_sha256",
+                "diarization_artifact_sha256",
+                "asr_model_revision",
+                "diarization_model_revision",
+                "reviewer_reference_sha256",
+            }
+        ),
+        frozenset({"artifact_count", "asr_file_count", "diarization_file_count"}),
         frozenset({"model_set_id"}),
     ),
     "real-agent-traces": (
@@ -59,7 +70,15 @@ _EVIDENCE_SCHEMAS: Final = {
         frozenset({"agent_ids", "provider_request_ids_sha256"}),
     ),
     "gpu-benchmark": (
-        frozenset({"image_digest", "model_manifest_sha256", "runner_id_sha256", "workload_revision"}),
+        frozenset(
+            {
+                "declared_image_digest",
+                "model_manifest_sha256",
+                "runner_id_sha256",
+                "app_runtime_binding_sha256",
+                "workload_revision",
+            }
+        ),
         frozenset({"p50_ms", "p95_ms", "throughput_per_second"}),
         frozenset(),
     ),
@@ -69,12 +88,20 @@ _EVIDENCE_SCHEMAS: Final = {
         frozenset(),
     ),
     "websocket-gpu-p95": (
-        frozenset({"image_digest", "model_manifest_sha256", "runner_id_sha256", "workload_revision"}),
+        frozenset(
+            {
+                "declared_image_digest",
+                "model_manifest_sha256",
+                "runner_id_sha256",
+                "app_runtime_binding_sha256",
+                "workload_revision",
+            }
+        ),
         frozenset({"p95_ms", "session_count"}),
         frozenset(),
     ),
     "canonical-app-image": (
-        frozenset({"dockerfile_sha256", "image_digest", "lock_sha256", "runner_id_sha256"}),
+        frozenset({"dockerfile_sha256", "declared_image_digest", "lock_sha256", "runner_id_sha256"}),
         frozenset({"build_duration_seconds"}),
         frozenset(),
     ),
