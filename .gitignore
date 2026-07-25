@@ -25,8 +25,10 @@ models/*
 !models/.gitkeep
 !models/manifest.json
 
-# Internal project workflow and generated evidence stay local.
+# Internal agent workflow, sessions, and generated evidence stay local.
 /.claude/
+/.pi/
+/.ralph/
 /.pi-subagents/
 /artifacts/
 /release/
