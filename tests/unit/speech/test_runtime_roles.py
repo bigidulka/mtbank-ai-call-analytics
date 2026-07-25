@@ -6,22 +6,21 @@ from uuid import UUID
 
 import pytest
 
-from mtbank_ai.policies import PolicyLoadError
 from mtbank_ai.speech.contracts import RoleResolutionCandidate, SpeechFile
-from mtbank_ai.speech.roles import PolicyRoleResolver, RoleResolutionRequiredError
-from services.speech import runtime as speech_runtime
+from mtbank_ai.speech.roles import RoleResolutionRequiredError
 from services.speech.engine import CanonicalBatchEngine
 from services.speech.errors import SpeechConfigurationError
+from services.speech.role_agent import LlmRoleResolver
 from services.speech.runtime import LazySpeechRuntime
 from tests.unit.speech._helpers import make_registry
 
 
-def test_runtime_loads_verified_policy_by_default_and_preserves_explicit_none(tmp_path) -> None:
+def test_runtime_loads_llm_role_agent_by_default_and_preserves_explicit_none(tmp_path) -> None:
     _, settings = make_registry(tmp_path)
     received: list[object] = []
 
-    def factory(registry, runtime, groq, resolver):
-        del registry, runtime, groq
+    def factory(registry, runtime, faster_whisper, resolver):
+        del registry, runtime, faster_whisper
         received.append(resolver)
         return cast(CanonicalBatchEngine, object())
 
@@ -29,7 +28,7 @@ def test_runtime_loads_verified_policy_by_default_and_preserves_explicit_none(tm
         default_runtime = LazySpeechRuntime(settings, engine_factory=factory)
         assert await default_runtime.ready()
         await default_runtime._get_engine()
-        assert isinstance(received[-1], PolicyRoleResolver)
+        assert isinstance(received[-1], LlmRoleResolver)
 
         explicit_none_runtime = LazySpeechRuntime(settings, engine_factory=factory, role_resolver=None)
         assert await explicit_none_runtime.ready()
@@ -39,24 +38,12 @@ def test_runtime_loads_verified_policy_by_default_and_preserves_explicit_none(tm
     asyncio.run(scenario())
 
 
-def test_runtime_fails_closed_when_default_verified_policy_is_unavailable(
-    tmp_path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_runtime_fails_closed_when_role_agent_configuration_is_unavailable(tmp_path) -> None:
     _, settings = make_registry(tmp_path)
+    invalid_settings = settings.model_copy(update={"role_agent": None})
 
-    class MissingPolicyRegistry:
-        @property
-        def roles(self):
-            raise PolicyLoadError("missing")
-
-    monkeypatch.setattr(speech_runtime, "PolicyRegistry", MissingPolicyRegistry)
-
-    with pytest.raises(SpeechConfigurationError, match="verified roles policy"):
-        LazySpeechRuntime(settings)
-
-    explicit_none_runtime = LazySpeechRuntime(settings, role_resolver=None)
-    assert asyncio.run(explicit_none_runtime.ready())
+    with pytest.raises(SpeechConfigurationError, match="role agent configuration"):
+        LazySpeechRuntime(invalid_settings)
 
 
 def test_runtime_explicit_none_keeps_role_resolution_fail_closed_and_ready(tmp_path) -> None:
@@ -74,8 +61,8 @@ def test_runtime_explicit_none_keeps_role_resolution_fail_closed_and_ready(tmp_p
                 )
             )
 
-    def factory(registry, runtime, groq, resolver):
-        del registry, runtime, groq
+    def factory(registry, runtime, faster_whisper, resolver):
+        del registry, runtime, faster_whisper
         assert resolver is None
         return cast(CanonicalBatchEngine, FailClosedEngine())
 

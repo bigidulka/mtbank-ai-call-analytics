@@ -124,7 +124,6 @@ class CanonicalBatchEngine:
                 diarized_segments,
                 metadata_mappings=source.metadata.role_mappings,
                 resolver=self._role_resolver,
-                review_confidence_threshold=self._runtime.role_review_confidence_threshold,
             )
         assignments = {item.original_speaker_id: item for item in resolution.assignments}
         resolved_segments = tuple(

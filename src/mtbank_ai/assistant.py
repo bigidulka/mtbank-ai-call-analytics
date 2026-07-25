@@ -19,7 +19,7 @@ from mtbank_ai.agent_runtime import (
 from mtbank_ai.config import AgentRuntimeSettings
 from mtbank_ai.domain.base import StrictFrozenModel
 
-_PROMPT_ID = "demo-assistant"
+_PROMPT_ID = "demo_assistant"
 _PROMPT_VERSION = "v1"
 _PROMPT_ROOT = Path(__file__).resolve().parent / "agents"
 _MAX_HISTORY_MESSAGES = 8

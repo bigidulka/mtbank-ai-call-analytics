@@ -658,13 +658,13 @@ def test_populated_legacy_upgrade_fails_atomically_without_reading_payload(
     url, config = database
     _reset(config, "0001_foundation")
     run_id = uuid4()
-    payload = {"opaque": "legacy-private-sentinel", "nested": {"value": 7}}
+    payload = {"opaque": "incompatible-private-sentinel", "nested": {"value": 7}}
     asyncio.run(_insert_legacy_analysis(url, run_id, payload))
 
     with pytest.raises(RuntimeError, match="refuses populated analyses") as error:
         command.upgrade(config, "head")
 
-    assert "legacy-private-sentinel" not in str(error.value)
+    assert "incompatible-private-sentinel" not in str(error.value)
     assert asyncio.run(_revision(url)) == "0001_foundation"
     assert asyncio.run(_schema(url))["analyses_columns"] == {
         "run_id",

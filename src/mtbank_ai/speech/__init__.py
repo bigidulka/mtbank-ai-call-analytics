@@ -9,12 +9,11 @@ from mtbank_ai.speech.contracts import (
     SpeechMetadata,
     SpeechTranscriptionResponse,
 )
-from mtbank_ai.speech.roles import PolicyRoleResolver, RoleResolutionRequiredError, RoleResolverPort
+from mtbank_ai.speech.roles import RoleResolutionRequiredError, RoleResolverPort
 
 __all__ = [
     "DiarizedSegment",
     "HttpSpeechServiceClient",
-    "PolicyRoleResolver",
     "RoleResolutionDecision",
     "RoleResolutionRequiredError",
     "RoleSegmentEvidence",

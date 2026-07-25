@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import HttpUrl, SecretStr
 
 from services.speech.manifest import ModelArtifact, ModelRegistry, SpeechModelManifest, artifact_tree_sha256
 from services.speech.settings import (
     GroqTranscriptionSettings,
+    RoleAgentSettings,
     SpeechAccessSettings,
     SpeechModelSettings,
     SpeechRuntimeSettings,
@@ -51,6 +52,11 @@ def make_registry(
     settings = SpeechSettings(
         runtime=resolved_runtime,
         groq=GroqTranscriptionSettings(api_key=SecretStr("test-groq-key")),
+        role_agent=RoleAgentSettings(
+            base_url=HttpUrl("https://gateway.example.test/v1"),
+            api_key=SecretStr("N7!qR2@vL9#sX4$kM8%tY1^cD6&hJ3*F"),
+            model="role-model",
+        ),
         access=SpeechAccessSettings(mode="internal"),
         models=SpeechModelSettings(manifest_path=str(manifest_path), artifact_root=str(artifact_root)),
     )

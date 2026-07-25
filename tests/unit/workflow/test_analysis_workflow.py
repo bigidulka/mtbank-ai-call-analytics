@@ -31,6 +31,7 @@ from mtbank_ai.domain.transcript import (
     ASRMetadata,
     RoleAssignment,
     RoleResolution,
+    RoleResolutionSource,
     SpeakerRole,
     TranscriptSegment,
     TranscriptSnapshot,
@@ -79,6 +80,8 @@ def _transcript() -> TranscriptSnapshot:
                     role=SpeakerRole.OPERATOR,
                     confidence=0.9,
                     evidence_segment_ids=(SEGMENT_ID,),
+                    source=RoleResolutionSource.METADATA,
+                    resolution_evidence="test_fixture",
                 ),
             ),
             needs_review=False,
@@ -137,7 +140,11 @@ def _outputs() -> dict[str, object]:
             )
         ),
         "summarizer": SummaryResult(
-            summary="Оператор поздоровался. Клиент уточнил кредит. Оператор объяснил дальнейшие действия.",
+            sentences=(
+                "Оператор поздоровался.",
+                "Клиент уточнил кредит.",
+                "Оператор объяснил дальнейшие действия.",
+            ),
             fact_segment_ids=(SEGMENT_ID,),
             action_items=(ActionItem(text="Отправить условия.", evidence_segment_ids=(SEGMENT_ID,)),),
         ),

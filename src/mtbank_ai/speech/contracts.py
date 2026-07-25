@@ -19,7 +19,7 @@ from mtbank_ai.domain.base import (
 )
 from mtbank_ai.domain.transcript import (
     ASRProviderMetadata,
-    RolePolicyProvenance,
+    RoleAgentProvenance,
     SpeakerRole,
     TranscriptSnapshot,
     WordTimestamp,
@@ -236,7 +236,7 @@ class ResolvedRole(StrictFrozenModel):
 
 class RoleResolutionDecision(StrictFrozenModel):
     roles: tuple[ResolvedRole, ...] = ()
-    policy_provenance: RolePolicyProvenance | None = None
+    agent_provenance: RoleAgentProvenance | None = None
 
 
 class SpeechTranscriptionResponse(StrictFrozenModel):

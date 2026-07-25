@@ -97,20 +97,6 @@ class ArtifactProvenance(StrictFrozenModel):
     artifact_content_sha256: Sha256
 
 
-class LegacyArtifactProvenance(StrictFrozenModel):
-    """Предыдущий script-owned marker, допустимый только для atomic migration."""
-
-    schema_version: Literal[1]
-    repo_id: NonEmptyId
-    expected_resolved_repo_id: NonEmptyId | None = None
-    model_id: NonEmptyId
-    model_revision: GitRevision
-    package: NonEmptyId
-    package_version: NonEmptyId
-    license: NonEmptyId
-    artifact_content_sha256: Sha256
-
-
 class HubApi(Protocol):
     def model_info(self, *, repo_id: str, revision: str, token: str | None) -> object: ...
 
@@ -488,15 +474,8 @@ def _refresh_component_provenance(name: str, target: Path, source: ModelSource) 
     payload = _read_provenance_payload(name, marker)
     try:
         current = ArtifactProvenance.model_validate(payload)
-    except ValidationError:
-        try:
-            legacy = LegacyArtifactProvenance.model_validate(payload)
-        except ValidationError as error:
-            raise ProvisioningError(f"{name} artifact provenance is invalid") from error
-        if not _provenance_identity_matches(legacy, expected):
-            raise ProvisioningError(f"{name} artifact provenance does not match configured source")
-        _atomically_replace_provenance(marker, expected)
-        return
+    except ValidationError as error:
+        raise ProvisioningError(f"{name} artifact provenance is invalid") from error
     if current != expected:
         raise ProvisioningError(f"{name} artifact provenance or content does not match configured source")
     marker.chmod(0o644)
@@ -510,21 +489,6 @@ def _read_provenance_payload(name: str, marker: Path) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise ProvisioningError(f"{name} artifact provenance is invalid")
     return cast(dict[str, object], payload)
-
-
-def _provenance_identity_matches(
-    provenance: LegacyArtifactProvenance,
-    expected: ArtifactProvenance,
-) -> bool:
-    return (
-        provenance.repo_id == expected.repo_id
-        and provenance.expected_resolved_repo_id == expected.expected_resolved_repo_id
-        and provenance.model_id == expected.model_id
-        and provenance.model_revision == expected.model_revision
-        and provenance.package == expected.package
-        and provenance.package_version == expected.package_version
-        and provenance.license == expected.license
-    )
 
 
 def _expected_provenance(source: ModelSource, artifact_content_sha256: str) -> ArtifactProvenance:

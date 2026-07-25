@@ -76,12 +76,46 @@ class GroqTranscriptionSettings(StrictFrozenModel):
         return hashlib.sha256(str(self.endpoint).encode("utf-8")).hexdigest()
 
 
+class RoleAgentSettings(StrictFrozenModel):
+    base_url: HttpUrl
+    api_key: SecretStr
+    model: NonEmptyId
+    prompt_effective_date: NonEmptyId = "2026-07-25"
+    timeout_seconds: PositiveFloat = 15.0
+    connect_timeout_seconds: PositiveFloat = 5.0
+    max_output_tokens: PositiveInt = 700
+    max_input_chars: PositiveInt = 20_000
+    max_candidates: PositiveInt = 2
+    review_confidence_threshold: Confidence = 0.75
+
+    @field_validator("api_key")
+    @classmethod
+    def validate_api_key(cls, value: SecretStr) -> SecretStr:
+        key = value.get_secret_value()
+        if not key.isascii():
+            raise ValueError("role agent API key must be ASCII")
+        try:
+            require_runtime_secret("MTBANK_SPEECH__ROLE_AGENT__API_KEY", key)
+        except SecretConfigurationError as error:
+            raise ValueError("role agent API key is unsafe") from error
+        return value
+
+    @model_validator(mode="after")
+    def validate_limits(self) -> Self:
+        if self.base_url.scheme != "https" or self.base_url.query is not None or self.base_url.fragment is not None:
+            raise ValueError("role agent requires HTTPS gateway URL without query or fragment")
+        if self.connect_timeout_seconds > self.timeout_seconds:
+            raise ValueError("role agent connect timeout cannot exceed timeout")
+        if self.max_candidates > 2:
+            raise ValueError("role agent supports at most two speakers")
+        return self
+
+
 class SpeechRuntimeSettings(StrictFrozenModel):
     device: Literal["cpu", "cuda"] = "cpu"
     image_digest: str | None = None
     language: Literal["ru"] = "ru"
     pipeline_revision: NonEmptyId = "speech/local-faster-whisper-v1"
-    role_review_confidence_threshold: Confidence = 0.75
     normalization_sample_rate_hz: PositiveInt = 16_000
     normalization_channels: Literal[1] = 1
     normalization_codec: Literal["pcm_s16le"] = "pcm_s16le"
@@ -188,6 +222,7 @@ class SpeechSettings(BaseSettings):
     runtime: SpeechRuntimeSettings = SpeechRuntimeSettings()
     faster_whisper: FasterWhisperSettings = FasterWhisperSettings()
     groq: GroqTranscriptionSettings | None = None
+    role_agent: RoleAgentSettings | None = None
     streaming: SpeechStreamingSettings = SpeechStreamingSettings()
     models: SpeechModelSettings = SpeechModelSettings()
     access: SpeechAccessSettings

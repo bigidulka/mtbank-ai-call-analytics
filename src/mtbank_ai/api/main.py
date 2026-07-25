@@ -32,11 +32,11 @@ from mtbank_ai.application.ports import (
 from mtbank_ai.assistant import DemoAssistant
 from mtbank_ai.config import Settings
 from mtbank_ai.observability import Telemetry
-from mtbank_ai.speech.client import HttpSpeechServiceClient, SpeechServiceClientSettings
 from mtbank_ai.speech.streaming import (
     InternalSpeechWebSocketAdapter,
     InternalSpeechWebSocketSettings,
-    RollingHttpSpeechAdapter,
+    RemoteSpeechWebSocketAdapter,
+    RemoteSpeechWebSocketSettings,
     StreamingSpeechPort,
 )
 from mtbank_ai.storage.postgres import PostgresReadiness, create_postgres_engine
@@ -195,21 +195,11 @@ def _build_streaming_speech_adapter(settings: Settings) -> StreamingSpeechPort |
         return InternalSpeechWebSocketAdapter(InternalSpeechWebSocketSettings(**common))
     if speech.api_key is None:
         raise RuntimeError("remote speech configuration requires an API key")
-    return RollingHttpSpeechAdapter(
-        HttpSpeechServiceClient(
-            SpeechServiceClientSettings(
-                mode=speech.mode,
-                base_url=speech.base_url,
-                api_key=speech.api_key,
-                transcription_path=speech.transcription_path,
-                timeout_seconds=speech.timeout_seconds,
-                max_success_response_bytes=speech.max_success_response_bytes,
-                max_error_response_bytes=speech.max_error_response_bytes,
-            )
-        ),
-        window_seconds=websocket.rolling_window_seconds,
-        step_seconds=websocket.rolling_step_seconds,
-        request_timeout_seconds=websocket.rolling_request_timeout_seconds,
+    return RemoteSpeechWebSocketAdapter(
+        RemoteSpeechWebSocketSettings(
+            **common,
+            api_key=speech.api_key,
+        )
     )
 
 

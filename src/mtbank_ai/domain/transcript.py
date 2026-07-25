@@ -31,13 +31,11 @@ class SpeakerRole(StrEnum):
 class RoleResolutionSource(StrEnum):
     """Источник явного назначения роли без эвристики порядка спикеров."""
 
-    LEGACY = "legacy"
     METADATA = "metadata"
-    RESOLVER = "resolver"
-    POLICY = "policy"
+    AGENT = "agent"
 
 
-class RolePolicyProvenance(StrictFrozenModel):
+class RoleAgentProvenance(StrictFrozenModel):
     policy_id: NonEmptyId
     version: NonEmptyId
     owner: NonEmptyId
@@ -74,8 +72,8 @@ class RoleAssignment(StrictFrozenModel):
     role: SpeakerRole
     confidence: Confidence
     evidence_segment_ids: Annotated[tuple[UUID, ...], Field(min_length=1)]
-    source: RoleResolutionSource = RoleResolutionSource.LEGACY
-    resolution_evidence: NonEmptyId = "legacy"
+    source: RoleResolutionSource
+    resolution_evidence: NonEmptyId
 
     @model_validator(mode="after")
     def require_unique_evidence(self) -> Self:
@@ -87,16 +85,16 @@ class RoleAssignment(StrictFrozenModel):
 class RoleResolution(StrictFrozenModel):
     assignments: Annotated[tuple[RoleAssignment, ...], Field(min_length=1)]
     needs_review: bool
-    policy_provenance: RolePolicyProvenance | None = None
+    agent_provenance: RoleAgentProvenance | None = None
 
     @model_validator(mode="after")
     def require_unique_speakers(self) -> Self:
         speaker_ids = tuple(item.original_speaker_id for item in self.assignments)
         if len(set(speaker_ids)) != len(speaker_ids):
             raise ValueError("original speaker IDs должны быть уникальны")
-        has_policy_assignment = any(item.source is RoleResolutionSource.POLICY for item in self.assignments)
-        if has_policy_assignment != (self.policy_provenance is not None):
-            raise ValueError("policy role assignments требуют точную policy provenance")
+        has_agent_assignment = any(item.source is RoleResolutionSource.AGENT for item in self.assignments)
+        if has_agent_assignment != (self.agent_provenance is not None):
+            raise ValueError("agent role assignments требуют точную prompt provenance")
         if len(self.assignments) == 2 and {item.role for item in self.assignments} != {
             SpeakerRole.OPERATOR,
             SpeakerRole.CLIENT,

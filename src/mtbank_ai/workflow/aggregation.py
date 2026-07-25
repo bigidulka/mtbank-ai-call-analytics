@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
@@ -35,8 +34,6 @@ from mtbank_ai.domain.analysis import (
 )
 from mtbank_ai.domain.transcript import TranscriptSnapshot
 from mtbank_ai.policies import PolicyRegistry
-
-_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])(?:\s+|$)")
 
 
 class AggregationError(ValueError):
@@ -222,10 +219,6 @@ def _validate_compliance(
 
 
 def _validate_summary(summary: SummaryResult, known_segment_ids: set[UUID]) -> None:
-    sentences = tuple(sentence for sentence in _SENTENCE_BOUNDARY.split(summary.summary.strip()) if sentence.strip())
-    sentence_count = len(sentences)
-    if not 3 <= sentence_count <= 5:
-        raise AggregationError("summary должен содержать от трёх до пяти предложений")
     _require_known_evidence(summary.fact_segment_ids, known_segment_ids)
     for item in summary.action_items:
         _require_known_evidence(item.evidence_segment_ids, known_segment_ids)

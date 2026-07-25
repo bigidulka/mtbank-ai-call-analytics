@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import unicodedata
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -18,16 +17,11 @@ from mtbank_ai.domain.agents import ComplianceSeverity
 from mtbank_ai.domain.base import Confidence, LongText, NonEmptyId, StrictFrozenModel
 
 _POLICY_COMPONENT = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
-_POLICY_NAMES = ("taxonomy", "quality", "compliance", "roles")
-PolicyName: TypeAlias = Literal["taxonomy", "quality", "compliance", "roles"]
+_POLICY_NAMES = ("taxonomy", "quality", "compliance")
+PolicyName: TypeAlias = Literal["taxonomy", "quality", "compliance"]
 _TOPIC_IDS = frozenset({"кредиты", "карты", "переводы", "жалобы", "другое"})
 _PRIORITY_IDS = frozenset({"low", "medium", "high"})
 _QUALITY_CRITERIA = ("greeting", "need_detection", "solution_provided", "farewell")
-
-
-def _normalize_role_phrase(value: str) -> str:
-    normalized = unicodedata.normalize("NFKC", value).casefold().replace("ё", "е")
-    return " ".join("".join(character if character.isalnum() else " " for character in normalized).split())
 
 
 class PolicyLoadError(ValueError):
@@ -169,86 +163,7 @@ class CompliancePolicy(StrictFrozenModel):
         raise PolicyLoadError("rule отсутствует в compliance policy")
 
 
-class RoleSignal(StrictFrozenModel):
-    id: NonEmptyId
-    weight: float = Field(gt=0.0)
-    phrases: tuple[NonEmptyId, ...] = Field(min_length=1)
-
-    @field_validator("phrases", mode="before")
-    @classmethod
-    def parse_phrases(cls, value: object) -> object:
-        return tuple(value) if isinstance(value, list) else value
-
-    @model_validator(mode="after")
-    def require_unique_phrases(self) -> RoleSignal:
-        normalized_phrases = tuple(_normalize_role_phrase(phrase) for phrase in self.phrases)
-        if not all(normalized_phrases) or len(set(normalized_phrases)) != len(normalized_phrases):
-            raise ValueError("role signal phrases должны быть уникальны после normalization")
-        return self
-
-
-class RoleSignals(StrictFrozenModel):
-    operator: tuple[RoleSignal, ...] = Field(min_length=1)
-    client: tuple[RoleSignal, ...] = Field(min_length=1)
-
-    @field_validator("operator", "client", mode="before")
-    @classmethod
-    def parse_signals(cls, value: object) -> object:
-        return tuple(value) if isinstance(value, list) else value
-
-    @model_validator(mode="after")
-    def require_unique_ids_per_role(self) -> RoleSignals:
-        normalized_phrases: list[str] = []
-        for signals in (self.operator, self.client):
-            identifiers = tuple(signal.id for signal in signals)
-            if len(set(identifiers)) != len(identifiers):
-                raise ValueError("role signal IDs должны быть уникальны внутри роли")
-            normalized_phrases.extend(_normalize_role_phrase(phrase) for signal in signals for phrase in signal.phrases)
-        if len(set(normalized_phrases)) != len(normalized_phrases):
-            raise ValueError("role signal phrases должны быть уникальны внутри и между ролями")
-        return self
-
-
-class RoleThresholds(StrictFrozenModel):
-    minimum_operator_score: float = Field(gt=0.0)
-    minimum_client_score: float = Field(gt=0.0)
-    minimum_full_assignment_margin: float = Field(gt=0.0)
-    supported_automatic_total_speakers: Literal[2]
-    review_confidence_threshold: Confidence
-
-    @model_validator(mode="after")
-    def validate_thresholds(self) -> RoleThresholds:
-        if self.review_confidence_threshold <= 0.0:
-            raise ValueError("role review confidence threshold должен быть положительным")
-        return self
-
-
-class RoleConfidenceFormula(StrictFrozenModel):
-    minimum: Confidence
-    maximum: Confidence
-    score_scale: float = Field(gt=0.0)
-    margin_scale: float = Field(gt=0.0)
-    score_weight: float = Field(ge=0.0, le=1.0)
-    margin_weight: float = Field(ge=0.0, le=1.0)
-
-    @model_validator(mode="after")
-    def validate_formula(self) -> RoleConfidenceFormula:
-        if self.minimum >= self.maximum:
-            raise ValueError("role confidence maximum должен быть выше minimum")
-        total = Decimal(str(self.score_weight)) + Decimal(str(self.margin_weight))
-        if total != Decimal("1"):
-            raise ValueError("role confidence weights должны суммироваться ровно до 1")
-        return self
-
-
-class RolesPolicy(StrictFrozenModel):
-    metadata: PolicyMetadata
-    signals: RoleSignals
-    thresholds: RoleThresholds
-    confidence: RoleConfidenceFormula
-
-
-Policy = TaxonomyPolicy | QualityPolicy | CompliancePolicy | RolesPolicy
+Policy = TaxonomyPolicy | QualityPolicy | CompliancePolicy
 PolicyType = TypeVar("PolicyType", bound=Policy)
 
 
@@ -266,7 +181,6 @@ _POLICY_MODELS: dict[str, type[Policy]] = {
     "taxonomy": TaxonomyPolicy,
     "quality": QualityPolicy,
     "compliance": CompliancePolicy,
-    "roles": RolesPolicy,
 }
 
 
@@ -324,7 +238,6 @@ class PolicyRegistry:
         self._taxonomy: LoadedPolicyPack[TaxonomyPolicy] | None = None
         self._quality: LoadedPolicyPack[QualityPolicy] | None = None
         self._compliance: LoadedPolicyPack[CompliancePolicy] | None = None
-        self._roles: LoadedPolicyPack[RolesPolicy] | None = None
 
     @property
     def taxonomy(self) -> LoadedPolicyPack[TaxonomyPolicy]:
@@ -367,20 +280,6 @@ class PolicyRegistry:
                 policy=cast(CompliancePolicy, loaded.policy),
             )
         return self._compliance
-
-    @property
-    def roles(self) -> LoadedPolicyPack[RolesPolicy]:
-        if self._roles is None:
-            loaded = load_policy_pack("roles", self._version, root=self._root)
-            self._roles = LoadedPolicyPack(
-                name="roles",
-                version=loaded.version,
-                owner=loaded.owner,
-                effective_date=loaded.effective_date,
-                sha256=loaded.sha256,
-                policy=cast(RolesPolicy, loaded.policy),
-            )
-        return self._roles
 
     def load_all(self) -> tuple[LoadedPolicyPack[Policy], ...]:
         return (

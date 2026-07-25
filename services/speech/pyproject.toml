@@ -7,6 +7,7 @@ dependencies = [
   "faster-whisper==1.2.1",
   "fastapi==0.139.0",
   "httpx==0.28.1",
+  "openai==2.11.0",
   "pydantic==2.13.4",
   "pydantic-settings==2.14.2",
   "pyannote.audio==4.0.7",

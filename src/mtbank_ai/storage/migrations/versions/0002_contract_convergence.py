@@ -25,7 +25,8 @@ depends_on: str | None = None
 SCHEMA = "public"
 TABLES = ("runs", "run_events", "analyses")
 _POPULATED_ANALYSES_ERROR = (
-    "0002_contract_convergence refuses populated analyses; export and remediate legacy data outside this migration"
+    "0002_contract_convergence refuses populated analyses; "
+    "export and remediate incompatible data outside this migration"
 )
 _UNSUPPORTED_SCHEMA_ERROR = "0002_contract_convergence found an unsupported managed schema"
 _MANAGED_UPDATE_ERROR = "0002_contract_convergence managed data transition failed"

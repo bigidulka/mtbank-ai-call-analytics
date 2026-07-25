@@ -12,7 +12,6 @@ from mtbank_ai.speech.streaming import (
     InternalSpeechWebSocketSettings,
     RemoteSpeechWebSocketAdapter,
     RemoteSpeechWebSocketSettings,
-    RollingHttpSpeechAdapter,
     StreamingAdapterUnavailable,
     StreamingProtocolError,
     StreamingStart,
@@ -27,21 +26,6 @@ from services.speech.streaming import (
     StreamingRuntimeLimits,
     _OggLogicalStreamValidator,
 )
-
-
-class _HttpTranscriber:
-    def __init__(self, text: str = "частичный текст", *, fails: bool = False) -> None:
-        self.text = text
-        self.fails = fails
-        self.sources: list[Any] = []
-
-    async def transcribe(self, source: Any) -> Any:
-        self.sources.append(source)
-        if self.fails:
-            raise RuntimeError("transient speech failure")
-        segment = type("Segment", (), {"text": self.text})()
-        transcript = type("Transcript", (), {"segments": (segment,)})()
-        return type("Response", (), {"transcript": transcript})()
 
 
 class _FakeWebSocket:
@@ -319,33 +303,6 @@ def test_internal_streaming_settings_require_a_trusted_base_url_and_safe_path() 
             close_timeout_seconds=1.0,
             max_message_bytes=1,
         )
-
-
-def test_rolling_http_adapter_emits_bounded_partial_and_skips_transient_failure() -> None:
-    transcriber = _HttpTranscriber()
-    session = asyncio.run(
-        RollingHttpSpeechAdapter(
-            transcriber,
-            window_seconds=0.001,
-            step_seconds=0.001,
-            request_timeout_seconds=1.0,
-        ).open(StreamingStart(codec="pcm_s16le", sample_rate_hz=16_000, channels=1))
-    )
-    updates = asyncio.run(session.push(b"\x01\x00" * 16, sequence=1))
-    assert updates == (StreamingUpdate(sequence=1, text="частичный текст", stable_prefix=False),)
-    assert transcriber.sources[0].content.startswith(b"RIFF")
-    assert len(transcriber.sources[0].content) == 76
-
-    failing = _HttpTranscriber(fails=True)
-    failing_session = asyncio.run(
-        RollingHttpSpeechAdapter(
-            failing,
-            window_seconds=0.001,
-            step_seconds=0.001,
-            request_timeout_seconds=1.0,
-        ).open(StreamingStart(codec="pcm_s16le", sample_rate_hz=16_000, channels=1))
-    )
-    assert asyncio.run(failing_session.push(b"\x01\x00" * 16, sequence=1)) == ()
 
 
 def test_rolling_session_emits_first_partial_then_commits_common_prefix() -> None:

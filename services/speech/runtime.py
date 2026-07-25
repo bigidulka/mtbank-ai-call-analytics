@@ -8,9 +8,8 @@ from pathlib import Path
 from typing import Protocol, cast
 
 from mtbank_ai.domain.provenance import ComponentRevision
-from mtbank_ai.policies import PolicyLoadError, PolicyRegistry
 from mtbank_ai.speech.contracts import SpeechFile, SpeechTranscriptionResponse
-from mtbank_ai.speech.roles import PolicyRoleResolver, RoleResolverPort
+from mtbank_ai.speech.roles import RoleResolverPort
 from mtbank_ai.speech.streaming import StreamingSpeechSession, StreamingStart, StreamingUpdate
 from services.speech.adapters import build_production_ports
 from services.speech.engine import CanonicalBatchEngine
@@ -22,6 +21,7 @@ from services.speech.errors import (
 )
 from services.speech.manifest import ModelRegistry
 from services.speech.media import MediaLimits, MediaNormalizer
+from services.speech.role_agent import LlmRoleResolver
 from services.speech.settings import FasterWhisperSettings, SpeechRuntimeSettings, SpeechSettings
 from services.speech.streaming import ProductionStreamingSpeechAdapter
 
@@ -67,7 +67,9 @@ class LazySpeechRuntime:
         self._registry = ModelRegistry.load(settings)
         self._engine_factory = engine_factory or _production_engine
         if role_resolver is _DEFAULT_ROLE_RESOLVER:
-            self._role_resolver = _load_default_role_resolver()
+            if settings.role_agent is None:
+                raise SpeechConfigurationError("role agent configuration is unavailable")
+            self._role_resolver = LlmRoleResolver(settings.role_agent)
         else:
             self._role_resolver = cast(RoleResolverPort | None, role_resolver)
         self._engine: CanonicalBatchEngine | None = None
@@ -147,7 +149,9 @@ class LazySpeechRuntime:
             raise
 
     async def close(self) -> None:
-        return None
+        close = getattr(self._role_resolver, "close", None)
+        if callable(close):
+            await asyncio.to_thread(close)
 
     async def _execute(self, source: SpeechFile) -> SpeechTranscriptionResponse:
         async with self._model_slot:
@@ -256,13 +260,6 @@ class UnavailableSpeechRuntime:
 
     async def close(self) -> None:
         return None
-
-
-def _load_default_role_resolver() -> PolicyRoleResolver:
-    try:
-        return PolicyRoleResolver(PolicyRegistry().roles)
-    except (PolicyLoadError, ValueError) as error:
-        raise SpeechConfigurationError("verified roles policy is unavailable") from error
 
 
 def _production_engine(

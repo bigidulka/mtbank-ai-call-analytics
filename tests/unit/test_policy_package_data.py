@@ -32,7 +32,7 @@ def test_wheel_contains_versioned_policy_packs_and_reviewed_prompts(tmp_path: Pa
     assert len(wheels) == 1
     with zipfile.ZipFile(wheels[0]) as wheel:
         contents = set(wheel.namelist())
-        for policy_name in ("compliance", "quality", "roles", "taxonomy"):
+        for policy_name in ("compliance", "quality", "taxonomy"):
             assert f"mtbank_ai/policies/{policy_name}/v1.yaml" in contents
         for agent_name in ("classifier", "compliance", "quality", "summarizer", "trends"):
             prompt_path = f"mtbank_ai/agents/{agent_name}/prompt.md"
@@ -41,3 +41,7 @@ def test_wheel_contains_versioned_policy_packs_and_reviewed_prompts(tmp_path: Pa
             assert prompt
             if agent_name == "trends":
                 assert "submit_trend" in prompt
+        for agent_name in ("demo_assistant", "role_resolver"):
+            prompt_path = f"mtbank_ai/agents/{agent_name}/v1.md"
+            assert prompt_path in contents
+            assert wheel.read(prompt_path).decode("utf-8").strip()

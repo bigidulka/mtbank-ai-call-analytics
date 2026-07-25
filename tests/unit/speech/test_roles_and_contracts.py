@@ -42,16 +42,26 @@ class Resolver:
 
     def resolve(self, candidates: tuple[RoleResolutionCandidate, ...]) -> RoleResolutionDecision:
         self.candidates = candidates
+        from mtbank_ai.domain.transcript import RoleAgentProvenance
+
         return RoleResolutionDecision(
             roles=tuple(
                 ResolvedRole(
                     original_speaker_id=candidate.original_speaker_id,
                     role=SpeakerRole.CLIENT,
                     confidence=self.confidence,
-                    evidence="resolver/v1",
+                    evidence="role_resolver/v1",
+                    evidence_segment_ids=candidate.evidence_segment_ids,
                 )
                 for candidate in candidates
-            )
+            ),
+            agent_provenance=RoleAgentProvenance(
+                policy_id="role_resolver",
+                version="v1",
+                owner="test",
+                effective_date="2026-07-25",
+                sha256="a" * 64,
+            ),
         )
 
 
@@ -93,7 +103,7 @@ def test_complete_low_confidence_resolver_assignment_keeps_exact_role_and_marks_
     resolution = resolve_roles((_segment(),), resolver=Resolver(confidence=0.7), review_confidence_threshold=0.75)
 
     assert resolution.assignments[0].role is SpeakerRole.CLIENT
-    assert resolution.assignments[0].source is RoleResolutionSource.RESOLVER
+    assert resolution.assignments[0].source is RoleResolutionSource.AGENT
     assert resolution.needs_review
 
 
@@ -123,18 +133,18 @@ def test_existing_transcript_domain_rejects_unresolved_role_fields() -> None:
     assert {role.value for role in SpeakerRole} == {"Оператор", "Клиент"}
 
 
-def test_policy_assignment_requires_exact_policy_provenance() -> None:
-    policy_assignment = RoleAssignment(
+def test_agent_assignment_requires_exact_prompt_provenance() -> None:
+    agent_assignment = RoleAssignment(
         original_speaker_id="SPEAKER_00",
         role=SpeakerRole.OPERATOR,
         confidence=0.9,
         evidence_segment_ids=(SEGMENT_ID,),
-        source=RoleResolutionSource.POLICY,
+        source=RoleResolutionSource.AGENT,
         resolution_evidence="v1/test",
     )
 
-    with pytest.raises(ValidationError, match="policy provenance"):
-        RoleResolution(assignments=(policy_assignment,), needs_review=False)
+    with pytest.raises(ValidationError, match="prompt provenance"):
+        RoleResolution(assignments=(agent_assignment,), needs_review=False)
 
 
 def test_two_speaker_resolution_requires_distinct_public_roles() -> None:
@@ -144,12 +154,16 @@ def test_two_speaker_resolution_requires_distinct_public_roles() -> None:
             role=SpeakerRole.OPERATOR,
             confidence=0.9,
             evidence_segment_ids=(SEGMENT_ID,),
+            source=RoleResolutionSource.METADATA,
+            resolution_evidence="test_fixture",
         ),
         RoleAssignment(
             original_speaker_id="SPEAKER_01",
             role=SpeakerRole.OPERATOR,
             confidence=0.9,
             evidence_segment_ids=(UUID("22222222-2222-4222-8222-222222222222"),),
+            source=RoleResolutionSource.METADATA,
+            resolution_evidence="test_fixture",
         ),
     )
 

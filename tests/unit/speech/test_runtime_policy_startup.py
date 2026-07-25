@@ -3,27 +3,15 @@ from __future__ import annotations
 import asyncio
 
 import httpx
-import pytest
 
-from mtbank_ai.policies import PolicyLoadError
-from services.speech import runtime as speech_runtime
 from services.speech.app import create_app
 from tests.unit.speech._helpers import make_registry
 
 
-def test_app_readiness_fails_closed_when_default_roles_policy_is_invalid(
-    tmp_path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_app_readiness_fails_closed_when_role_agent_configuration_is_missing(tmp_path) -> None:
     _, settings = make_registry(tmp_path)
-
-    class InvalidPolicyRegistry:
-        @property
-        def roles(self):
-            raise PolicyLoadError("invalid")
-
-    monkeypatch.setattr(speech_runtime, "PolicyRegistry", InvalidPolicyRegistry)
-    app = create_app(settings=settings)
+    invalid_settings = settings.model_copy(update={"role_agent": None})
+    app = create_app(settings=invalid_settings)
 
     async def scenario() -> None:
         transport = httpx.ASGITransport(app=app)

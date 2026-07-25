@@ -83,7 +83,7 @@ class ActionItem(StrictFrozenModel):
 
 
 class SummaryResult(StrictFrozenModel):
-    summary: LongText
+    sentences: Annotated[tuple[LongText, ...], Field(min_length=3, max_length=5)]
     fact_segment_ids: EvidenceSegmentIds
     action_items: tuple[ActionItem, ...]
 
@@ -91,3 +91,7 @@ class SummaryResult(StrictFrozenModel):
     def validate_facts(self) -> Self:
         _require_unique(self.fact_segment_ids)
         return self
+
+    @property
+    def summary(self) -> str:
+        return " ".join(self.sentences)

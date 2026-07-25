@@ -37,7 +37,7 @@ Create one GPU Pod using the published **image digest**. Configure:
 - container port `8010` exposed as an authenticated HTTPS endpoint through RunPod's proxy/domain;
 - persistent volume mounted at `/workspace/models` for `manifest.json` and both verified artifact directories; set `MTBANK_SPEECH__MODELS__MANIFEST_PATH=/workspace/models/manifest.json` and `MTBANK_SPEECH__MODELS__ARTIFACT_ROOT=/workspace/models/artifacts` when using this volume;
 - provision artifacts into that volume before container start or CUDA warmup, then verify their manifest digests; models are Docker-ignored and the published runtime image neither copies nor downloads them;
-- environment variables from [`env.example`](env.example), injected through RunPod secrets/environment UI, never command history; set `MTBANK_SPEECH__ACCESS__MODE=bearer`, `MTBANK_SPEECH__ACCESS__BEARER_KEY` equal to `MTBANK_RUNPOD_SPEECH_BEARER_KEY`, and `MTBANK_SPEECH__RUNTIME__IMAGE_DIGEST` to the deployed immutable `sha256:<64 lowercase hex>` image digest;
+- environment variables from [`env.example`](env.example), injected through RunPod secrets/environment UI, never command history; set `MTBANK_SPEECH__ACCESS__MODE=bearer`, `MTBANK_SPEECH__ACCESS__BEARER_KEY` equal to `MTBANK_RUNPOD_SPEECH_BEARER_KEY`, `MTBANK_SPEECH__RUNTIME__IMAGE_DIGEST` to the deployed immutable `sha256:<64 lowercase hex>` image digest, and configure the bounded role agent gateway/model/key;
 - no Docker Compose, Docker-in-Docker, or additional full application stack in the Pod.
 
 The service has no public anonymous processing endpoint in bearer mode:
@@ -55,6 +55,8 @@ curl --fail --silent --show-error \
 ```
 
 `/v1/runtime` returns configured device, CTranslate2 compute type, model identifiers, and the configured declared image digest only. It returns no transcript, audio, artifact path, tag, token, or secret. The GPU runner must not call this split-plane endpoint directly: it uses the protected app-plane `/v1/benchmark-runtime-binding` endpoint on the same public authority as `/ws/transcribe`; the app fetches this response from its configured remote backend server-side. Neither a self-reported digest nor its hash proves external registry provenance or independent attestation.
+
+Role labels are assigned by one bounded typed LLM role agent after diarization. It uses reviewed prompt `role_resolver/v1`, exact segment evidence, no tools beyond terminal submit, and fails closed when assignment is ambiguous or the provider is unavailable. No phrase/weight heuristic is present.
 
 To enable provisional streaming, set `MTBANK_SPEECH__STREAMING__ENABLED=true` and inject `MTBANK_SPEECH__GROQ__API_KEY` through RunPod secrets. The API connects directly to `/v1/stream` as `wss`, sends exactly one RunPod bearer header, disables proxy/compression, and rejects handshake redirects; Groq is used only for bounded provisional updates while local ASR and Community-1 remain canonical batch reconciliation.
 
