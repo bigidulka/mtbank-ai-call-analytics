@@ -165,6 +165,13 @@ class ModelResponse(StrictFrozenModel):
     usage: ModelUsage
     latency_ms: NonNegativeInt
     has_text_content: bool
+    text_content: LongText | None = None
+
+    @model_validator(mode="after")
+    def validate_text_content(self) -> Self:
+        if self.text_content is not None and not self.has_text_content:
+            raise ValueError("text_content требует has_text_content=true")
+        return self
 
 
 class PromptReference(StrictFrozenModel):

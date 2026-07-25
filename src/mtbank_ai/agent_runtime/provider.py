@@ -174,6 +174,9 @@ class OpenAICompatibleProvider:
                 output_tokens=usage.completion_tokens,
                 total_tokens=usage.total_tokens,
             )
+            text_content = (
+                message.content.strip() if isinstance(message.content, str) and message.content.strip() else None
+            )
             model_id = completion.model
             if not model_id:
                 raise ValueError("model отсутствует")
@@ -188,7 +191,8 @@ class OpenAICompatibleProvider:
                 tool_calls=tool_calls,
                 usage=response_usage,
                 latency_ms=latency_ms,
-                has_text_content=bool(message.content and message.content.strip()),
+                has_text_content=text_content is not None,
+                text_content=text_content,
             )
         except (TypeError, ValueError):
             raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE) from None

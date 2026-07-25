@@ -13,6 +13,7 @@ from pydantic import SecretStr
 from mtbank_ai.api.dependencies import require_api_key
 from mtbank_ai.api.main import create_app
 from mtbank_ai.application.ports import AnalyzeInput, FileAnalyzeInput, UrlAnalyzeInput
+from mtbank_ai.assistant import AssistantRequest, AssistantResponse
 from mtbank_ai.config import ApiSettings, DatabaseSettings, Settings
 from mtbank_ai.domain.agents import ComplianceSeverity
 from mtbank_ai.domain.analysis import (
@@ -72,6 +73,18 @@ class UnexpectedAnalyzer:
     async def analyze(self, source: AnalyzeInput, *, request_id: UUID) -> AnalyzeResponse:
         del source, request_id
         raise RuntimeError("response-sentinel-must-not-leak")
+
+
+class StubDemoAssistant:
+    def __init__(self) -> None:
+        self.requests: list[AssistantRequest] = []
+
+    async def answer(self, request: AssistantRequest) -> AssistantResponse:
+        self.requests.append(request)
+        return AssistantResponse(answer="Ответ настоящего помощника", model_id="assistant-model")
+
+    async def close(self) -> None:
+        return None
 
 
 class InvalidResponseAnalyzer:
@@ -237,6 +250,28 @@ def test_health_and_openapi_are_public_but_analyze_requires_bearer_auth() -> Non
         assert missing.status_code == wrong.status_code == 401
         assert _error(missing)["code"] == _error(wrong)["code"] == "unauthenticated"
         assert correct.status_code == 200
+
+    asyncio.run(scenario())
+
+
+def test_assistant_is_bearer_protected_and_returns_model_answer() -> None:
+    async def scenario() -> None:
+        assistant = StubDemoAssistant()
+        app = create_app(
+            settings=_settings(),
+            analyzer=StubAnalyzer(),
+            readiness=Ready(),
+            demo_assistant=assistant,  # type: ignore[arg-type]
+        )
+
+        payload = {"message": "Что ты умеешь?", "history": [{"role": "user", "content": "Привет"}]}
+        assert (await _request(app, "POST", "/assistant", json=payload)).status_code == 401
+        response = await _request(app, "POST", "/assistant", json=payload, headers=_auth())
+
+        assert response.status_code == 200
+        assert response.json() == {"answer": "Ответ настоящего помощника", "model_id": "assistant-model"}
+        assert assistant.requests[0].message == "Что ты умеешь?"
+        assert assistant.requests[0].history[0].content == "Привет"
 
     asyncio.run(scenario())
 

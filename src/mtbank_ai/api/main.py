@@ -16,6 +16,7 @@ from mtbank_ai.api.body_limits import BodyLimitMiddleware
 from mtbank_ai.api.error_handlers import install_error_handlers
 from mtbank_ai.api.readiness import CompositeReadiness, SpeechHttpReadiness
 from mtbank_ai.api.routes.analyze import router as analyze_router
+from mtbank_ai.api.routes.assistant import router as assistant_router
 from mtbank_ai.api.routes.health import router as health_router
 from mtbank_ai.api.routes.runtime_binding import router as runtime_binding_router
 from mtbank_ai.api.routes.transcribe_ws import WebSocketSessionManager
@@ -28,6 +29,7 @@ from mtbank_ai.application.ports import (
     UnavailableAnalyzeCall,
     UnavailableReadiness,
 )
+from mtbank_ai.assistant import DemoAssistant
 from mtbank_ai.config import Settings
 from mtbank_ai.observability import Telemetry
 from mtbank_ai.speech.client import HttpSpeechServiceClient, SpeechServiceClientSettings
@@ -39,7 +41,11 @@ from mtbank_ai.speech.streaming import (
 )
 from mtbank_ai.storage.postgres import PostgresReadiness, create_postgres_engine
 from mtbank_ai.trends import TrendsAgent
-from mtbank_ai.workflow.factory import build_configured_analysis_workflow, build_configured_trends_agent
+from mtbank_ai.workflow.factory import (
+    build_configured_analysis_workflow,
+    build_configured_demo_assistant,
+    build_configured_trends_agent,
+)
 
 RequestHandler = Callable[[Request], Awaitable[Response]]
 
@@ -52,6 +58,7 @@ def create_app(
     telemetry: Telemetry | None = None,
     streaming_speech: StreamingSpeechPort | None = None,
     trends_agent: TrendsAgent | None = None,
+    demo_assistant: DemoAssistant | None = None,
 ) -> FastAPI:
     resolved_settings = settings or Settings()  # pyright: ignore[reportCallIssue]
     resolved_telemetry = telemetry or Telemetry()
@@ -98,6 +105,9 @@ def create_app(
     else:
         resolved_readiness = UnavailableReadiness()
 
+    resolved_demo_assistant = demo_assistant or build_configured_demo_assistant(
+        resolved_settings, telemetry=resolved_telemetry
+    )
     resolved_trends_agent = trends_agent
     if resolved_trends_agent is None and engine is not None:
         resolved_trends_agent = build_configured_trends_agent(
@@ -110,7 +120,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         del app
         yield
-        await _close_resources(resolved_analyzer, resolved_trends_agent, resolved_readiness)
+        await _close_resources(resolved_analyzer, resolved_trends_agent, resolved_demo_assistant, resolved_readiness)
 
     app = FastAPI(
         title="MTBank Call Analytics API",
@@ -123,6 +133,7 @@ def create_app(
     app.state.telemetry = resolved_telemetry
     app.state.streaming_speech = resolved_streaming_speech
     app.state.trends_agent = resolved_trends_agent
+    app.state.demo_assistant = resolved_demo_assistant
     app.state.ws_sessions = WebSocketSessionManager(resolved_settings.websocket.max_sessions, resolved_telemetry)
     app.add_middleware(
         BodyLimitMiddleware,
@@ -149,6 +160,7 @@ def create_app(
     install_error_handlers(app)
     app.include_router(health_router)
     app.include_router(analyze_router)
+    app.include_router(assistant_router)
     app.include_router(runtime_binding_router)
     app.include_router(trends_router)
     app.include_router(transcribe_ws_router)

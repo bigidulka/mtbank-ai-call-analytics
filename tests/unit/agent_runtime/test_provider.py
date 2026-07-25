@@ -114,12 +114,14 @@ def _request(*, reasoning_effort: ReasoningEffort | None = None) -> ModelRequest
     )
 
 
-def _completion(*, request_id: str = "gateway-request-id", tool_call_id: str = "tool-call") -> object:
+def _completion(
+    *, request_id: str = "gateway-request-id", tool_call_id: str = "tool-call", text: str | None = None
+) -> object:
     return SimpleNamespace(
         choices=(
             SimpleNamespace(
                 message=SimpleNamespace(
-                    content=None,
+                    content=text,
                     tool_calls=(
                         SimpleNamespace(
                             id=tool_call_id,
@@ -147,9 +149,29 @@ def test_provider_maps_typed_response_and_uses_chat_completions_only() -> None:
     assert response.tool_calls[0].arguments_json == '{"x":"private"}'
     assert response.usage.total_tokens == 5
     assert response.has_text_content is False
+    assert response.text_content is None
     assert client.calls[0]["tool_choice"] == "required"
     assert "strict" not in client.calls[0]["tools"][0]["function"]
     assert "responses" not in vars(client)
+
+
+def test_provider_returns_bounded_text_content_for_text_assistant() -> None:
+    client = FakeClient(_completion(text="  Помогу проверить демо.  "))
+    provider = OpenAICompatibleProvider(_settings(), client=client, now=lambda: NOW)
+    request = ModelRequest(
+        model_id="configured-model",
+        messages=(ModelMessage(role=MessageRole.USER, content="Привет"),),
+        tools=(),
+        tool_choice=ToolChoice.NONE,
+        max_output_tokens=64,
+    )
+
+    response = asyncio.run(provider.complete(request, deadline_at=NOW + timedelta(seconds=10)))
+
+    assert response.has_text_content is True
+    assert response.text_content == "Помогу проверить демо."
+    assert client.calls[0]["tools"] == []
+    assert client.calls[0]["tool_choice"] == "none"
 
 
 @pytest.mark.parametrize("reasoning_effort", ("high", None))

@@ -8,6 +8,7 @@ from pydantic import HttpUrl, SecretStr, TypeAdapter
 from mtbank_ai.api.main import create_app
 from mtbank_ai.api.readiness import CompositeReadiness, SpeechHttpReadiness
 from mtbank_ai.application.ports import UnavailableAnalyzeCall, UnavailableReadiness
+from mtbank_ai.assistant import DemoAssistant
 from mtbank_ai.config import (
     AgentRuntimeSettings,
     ApiSettings,
@@ -56,6 +57,7 @@ def test_api_fails_closed_when_runtime_workflow_configuration_is_incomplete() ->
     assert isinstance(app.state.analyzer, UnavailableAnalyzeCall)
     assert isinstance(app.state.readiness, UnavailableReadiness)
     assert app.state.trends_agent is None
+    assert app.state.demo_assistant is None
 
 
 def test_api_builds_internal_streaming_adapter_only_when_public_websocket_is_enabled() -> None:
@@ -87,6 +89,7 @@ def test_api_builds_shared_workflow_and_readiness_only_from_complete_configurati
         assert app.state.readiness._dependencies[1]._mode == "internal_http"
         assert app.state.readiness._dependencies[1]._api_key is None
         assert isinstance(app.state.trends_agent, TrendsAgent)
+        assert isinstance(app.state.demo_assistant, DemoAssistant)
         async with app.router.lifespan_context(app):
             pass
 

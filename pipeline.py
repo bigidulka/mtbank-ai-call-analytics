@@ -41,6 +41,8 @@ _HARD_MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
 _TRUSTED_OPENWEBUI_INTERNAL_URL = "http://openwebui:8080"
 _TRUSTED_ANALYSIS_API_INTERNAL_URL = "http://api:8000"
 _JSON_RESPONSE_MAX_BYTES = 1 * 1024 * 1024
+_TEXT_ASSISTANT_MAX_HISTORY_MESSAGES = 8
+_TEXT_ASSISTANT_MAX_MESSAGE_CHARS = 2_000
 _ATTACHMENT_UNAVAILABLE_MESSAGE = "Вложение недоступно. Загрузите файл заново и повторите запрос."
 _TEXT_ASSISTANT_MARKER = "text_assistant"
 _TEXT_ASSISTANT_OVERVIEW = """## MTBank AI Call Analytics
@@ -349,6 +351,49 @@ class ApiAnalysisClient:
             raise DomainError(ErrorCode.SERVICE_UNAVAILABLE) from None
 
 
+class ApiAssistantClient:
+    """Pinned internal client for the real text-only LLM assistant."""
+
+    def __init__(
+        self,
+        *,
+        base_url: str,
+        api_key: str,
+        timeout_seconds: int,
+        opener: Callable[..., Any] | None = None,
+    ) -> None:
+        self._base_url = _require_exact_analysis_api_url(base_url)
+        self._api_key = _require_analysis_api_key(api_key)
+        self._timeout_seconds = timeout_seconds
+        self._opener = opener or build_trusted_opener(self._base_url)
+
+    def answer(self, message: str, history: list[dict[str, str]]) -> str:
+        payload = json.dumps(
+            {"message": message[:_TEXT_ASSISTANT_MAX_MESSAGE_CHARS], "history": history},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        request = Request(
+            f"{self._base_url}/assistant",
+            data=payload,
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Length": str(len(payload)),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with self._opener(request, timeout=self._timeout_seconds) as response:
+                parsed = _read_json_response(response)
+        except (HTTPError, URLError, OSError, TrustedHttpError, UnicodeDecodeError, ValueError):
+            return _render_text_assistant(message)
+        answer = parsed.get("answer") if isinstance(parsed, Mapping) else None
+        if not isinstance(answer, str) or not answer.strip() or len(answer) > 8_000:
+            return _render_text_assistant(message)
+        return answer.strip()
+
+
 class Pipeline:
     """Единый Pipeline для inlet transport, проверки bytes и internal Analyze API."""
 
@@ -363,6 +408,7 @@ class Pipeline:
         client_factory: Callable[..., FileClient] = OpenWebUIFileClient,
         *,
         analysis_adapter: PipelineAnalysisPort | None = None,
+        assistant_client: ApiAssistantClient | None = None,
     ) -> None:
         self.id = MAIN_PIPELINE_ID
         self.valves = self.Valves()
@@ -370,6 +416,7 @@ class Pipeline:
         self._client_factory = client_factory
         self._injected_analysis_adapter = analysis_adapter
         self._analysis_adapter = analysis_adapter
+        self._assistant_client = assistant_client
         self._file_client: FileClient | None = None
         self._signing_key: bytes | None = None
 
@@ -378,11 +425,14 @@ class Pipeline:
         self._signing_key = require_signing_key(os.getenv("MTBANK_ATTACHMENT_SIGNING_KEY"))
         self._file_client = self._create_file_client()
         self._analysis_adapter = self._create_analysis_adapter()
+        if not _pipeline_probe_mode_enabled():
+            self._assistant_client = self._assistant_client or self._create_assistant_client()
         self.name = self.valves.DISPLAY_NAME
 
     async def on_shutdown(self) -> None:
         self._file_client = None
         self._analysis_adapter = self._injected_analysis_adapter
+        self._assistant_client = None
         self._signing_key = None
 
     async def on_valves_updated(self) -> None:
@@ -390,6 +440,8 @@ class Pipeline:
         self._signing_key = require_signing_key(os.getenv("MTBANK_ATTACHMENT_SIGNING_KEY"))
         self._file_client = self._create_file_client()
         self._analysis_adapter = self._create_analysis_adapter()
+        if not _pipeline_probe_mode_enabled():
+            self._assistant_client = self._assistant_client or self._create_assistant_client()
         self.name = self.valves.DISPLAY_NAME
 
     async def inlet(self, body: dict[str, Any], user: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -437,9 +489,10 @@ class Pipeline:
     ) -> str:
         """Возвращает обычный text/SSE-compatible ответ для проверенного аудио."""
 
-        del model_id, messages
+        del model_id
         if body.get("mtbank_text_assistant") == _TEXT_ASSISTANT_MARKER:
-            return _render_text_assistant(user_message)
+            client = self._assistant_client or self._create_assistant_client()
+            return client.answer(user_message, _bounded_assistant_history(messages))
         if body.get("mtbank_attachment_error") or "mtbank_attachment_ref" not in body:
             return _controlled_message(self.name, _ATTACHMENT_UNAVAILABLE_MESSAGE)
 
@@ -549,6 +602,13 @@ class Pipeline:
             base_url=_require_exact_analysis_api_url(_TRUSTED_ANALYSIS_API_INTERNAL_URL),
             api_key=_require_analysis_api_key(os.getenv("MTBANK_API_KEY")),
             timeout_seconds=self.valves.HTTP_TIMEOUT_SECONDS,
+        )
+
+    def _create_assistant_client(self) -> ApiAssistantClient:
+        return ApiAssistantClient(
+            base_url=_require_exact_analysis_api_url(_TRUSTED_ANALYSIS_API_INTERNAL_URL),
+            api_key=_require_analysis_api_key(os.getenv("MTBANK_API_KEY")),
+            timeout_seconds=min(self.valves.HTTP_TIMEOUT_SECONDS, 20),
         )
 
     def _create_file_client(self) -> FileClient:
@@ -791,6 +851,19 @@ def _render_analysis_response(response: object, *, display_name: str) -> str:
         raise ValueError("analysis response должен быть JSON object")
     rendered = json.dumps(payload, ensure_ascii=False, indent=2)
     return f"## {html.escape(display_name, quote=True)}\n\n<pre>{html.escape(rendered, quote=True)}</pre>"
+
+
+def _bounded_assistant_history(messages: list[dict[str, Any]]) -> list[dict[str, str]]:
+    bounded: list[dict[str, str]] = []
+    for item in messages[-_TEXT_ASSISTANT_MAX_HISTORY_MESSAGES:]:
+        role = item.get("role")
+        content = item.get("content")
+        if role not in {"user", "assistant"} or not isinstance(content, str):
+            continue
+        normalized = content.strip()[:_TEXT_ASSISTANT_MAX_MESSAGE_CHARS]
+        if normalized:
+            bounded.append({"role": role, "content": normalized})
+    return bounded
 
 
 def _render_text_assistant(user_message: str) -> str:
