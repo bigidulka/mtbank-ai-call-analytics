@@ -33,7 +33,7 @@ class ToolAuthorizer:
         if terminal_index is not None and terminal_index != len(calls) - 1:
             raise ToolAuthorizationError(AgentFailureCode.POST_TERMINAL_TOOL_CALL)
 
-        seen_retrieval = set(completed_retrieval_tools)
+        completed_retrieval = set(completed_retrieval_tools)
         for index, call in enumerate(calls):
             is_terminal_name = call.spec.name == spec.terminal_submit_tool
             if is_terminal_name:
@@ -41,13 +41,11 @@ class ToolAuthorizer:
                     raise ToolAuthorizationError(AgentFailureCode.TERMINAL_SUBMIT_INVALID)
                 if index != terminal_index:
                     raise ToolAuthorizationError(AgentFailureCode.POST_TERMINAL_TOOL_CALL)
-                if not set(spec.required_retrieval_tools).issubset(seen_retrieval):
+                if not set(spec.required_retrieval_tools).issubset(completed_retrieval):
                     raise ToolAuthorizationError(AgentFailureCode.REQUIRED_RETRIEVAL_MISSING)
                 continue
 
             if call.spec.side_effect is not ToolSideEffect.READ_ONLY or call.spec.name not in spec.allowed_read_tools:
                 raise ToolAuthorizationError(AgentFailureCode.TOOL_NOT_ALLOWED)
-            if call.spec.name in spec.required_retrieval_tools:
-                seen_retrieval.add(call.spec.name)
 
         return terminal_index

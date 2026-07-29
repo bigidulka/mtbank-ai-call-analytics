@@ -51,7 +51,6 @@ class ToolCallStatus(StrEnum):
 
 class ModelStreamEventType(StrEnum):
     TEXT_DELTA = "text_delta"
-    TOOL_CALL_DELTA = "tool_call_delta"
     COMPLETED = "completed"
 
 
@@ -164,15 +163,6 @@ class ModelUsage(StrictFrozenModel):
         return self
 
 
-class ModelToolCallDelta(StrictFrozenModel):
-    """One incomplete provider tool-call fragment; never execute it directly."""
-
-    index: NonNegativeInt
-    id: NonEmptyId | None = None
-    name: NonEmptyId | None = None
-    arguments_delta: Annotated[str, Field(max_length=65_536)] | None = None
-
-
 class ModelResponse(StrictFrozenModel):
     request_id: NonEmptyId | None
     model_id: NonEmptyId
@@ -196,18 +186,14 @@ class ModelStreamEvent(StrictFrozenModel):
     sequence: PositiveInt
     type: ModelStreamEventType
     text_delta: Annotated[str, Field(min_length=1, max_length=20_000)] | None = None
-    tool_call_delta: ModelToolCallDelta | None = None
     response: ModelResponse | None = None
 
     @model_validator(mode="after")
     def validate_shape(self) -> Self:
         if self.type is ModelStreamEventType.TEXT_DELTA:
-            if self.text_delta is None or self.tool_call_delta is not None or self.response is not None:
+            if self.text_delta is None or self.response is not None:
                 raise ValueError("text delta должен содержать только text_delta")
-        elif self.type is ModelStreamEventType.TOOL_CALL_DELTA:
-            if self.tool_call_delta is None or self.text_delta is not None or self.response is not None:
-                raise ValueError("tool delta должен содержать только tool_call_delta")
-        elif self.response is None or self.text_delta is not None or self.tool_call_delta is not None:
+        elif self.response is None or self.text_delta is not None:
             raise ValueError("completed stream event должен содержать response")
         return self
 

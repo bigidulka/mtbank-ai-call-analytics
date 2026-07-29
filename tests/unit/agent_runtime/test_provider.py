@@ -278,9 +278,7 @@ def test_provider_stream_assembles_fragmented_text_and_tool_calls_and_closes_str
 
     assert [event.type.value for event in events] == [
         "text_delta",
-        "tool_call_delta",
         "text_delta",
-        "tool_call_delta",
         "completed",
     ]
     response = events[-1].response
@@ -289,6 +287,90 @@ def test_provider_stream_assembles_fragmented_text_and_tool_calls_and_closes_str
     assert response.tool_calls == (ModelToolCall(id="call-1", name="lookup", arguments_json='{"x":"safe"}'),)
     assert stream.closed is True
     assert client.calls[0]["stream"] is True
+
+
+def test_provider_stream_rejects_cumulative_text_and_tool_argument_overflow() -> None:
+    text_stream = FakeStream(
+        (
+            SimpleNamespace(
+                id="request-1",
+                model="configured-model",
+                choices=(
+                    SimpleNamespace(
+                        finish_reason=None,
+                        delta=SimpleNamespace(content="x" * 10_001, tool_calls=()),
+                    ),
+                ),
+                usage=None,
+            ),
+            SimpleNamespace(
+                id="request-1",
+                model="configured-model",
+                choices=(
+                    SimpleNamespace(
+                        finish_reason="stop",
+                        delta=SimpleNamespace(content="x" * 10_000, tool_calls=()),
+                    ),
+                ),
+                usage=SimpleNamespace(prompt_tokens=2, completion_tokens=3, total_tokens=5),
+            ),
+        )
+    )
+    tool_stream = FakeStream(
+        (
+            SimpleNamespace(
+                id="request-1",
+                model="configured-model",
+                choices=(
+                    SimpleNamespace(
+                        finish_reason=None,
+                        delta=SimpleNamespace(
+                            content=None,
+                            tool_calls=(
+                                SimpleNamespace(
+                                    index=0,
+                                    id="call-1",
+                                    function=SimpleNamespace(name="lookup", arguments="x" * 40_000),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                usage=None,
+            ),
+            SimpleNamespace(
+                id="request-1",
+                model="configured-model",
+                choices=(
+                    SimpleNamespace(
+                        finish_reason="tool_calls",
+                        delta=SimpleNamespace(
+                            content=None,
+                            tool_calls=(
+                                SimpleNamespace(
+                                    index=0,
+                                    id=None,
+                                    function=SimpleNamespace(name=None, arguments="x" * 30_000),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                usage=SimpleNamespace(prompt_tokens=2, completion_tokens=3, total_tokens=5),
+            ),
+        )
+    )
+
+    async def consume(stream: FakeStream) -> None:
+        provider = OpenAICompatibleProvider(_settings(), client=StreamingFakeClient((stream,)), now=lambda: NOW)
+        async for _event in provider.stream(_request(), deadline_at=NOW + timedelta(seconds=10)):
+            pass
+
+    for stream in (text_stream, tool_stream):
+        with pytest.raises(ProviderError) as error:
+            asyncio.run(consume(stream))
+        assert error.value.code is AgentFailureCode.MALFORMED_PROVIDER_RESPONSE
+        assert stream.closed is True
 
 
 def test_provider_stream_rejects_model_drift_and_closes_stream() -> None:

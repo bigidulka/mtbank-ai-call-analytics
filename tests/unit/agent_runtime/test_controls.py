@@ -15,6 +15,8 @@ from mtbank_ai.agent_runtime import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    ModelStreamEvent,
+    ModelStreamEventType,
     ModelToolCall,
     ModelUsage,
     ProviderError,
@@ -313,6 +315,61 @@ def test_circuit_breaker_opens_deterministically_after_failure() -> None:
     with pytest.raises(Exception) as error:
         asyncio.run(client.complete(_request(), deadline_at=NOW + timedelta(seconds=5)))
     assert getattr(error.value, "code") is AgentFailureCode.CIRCUIT_OPEN
+
+
+def test_stream_cancellation_releases_half_open_circuit_lease() -> None:
+    clock = [0.0]
+    breaker = CircuitBreaker(CircuitBreakerPolicy(failure_threshold=1, recovery_seconds=1), clock=lambda: clock[0])
+    breaker.record_failure()
+    clock[0] = 2.0
+
+    class StreamingClient:
+        async def complete(self, request: ModelRequest, *, deadline_at: datetime) -> ModelResponse:
+            del request, deadline_at
+            return _response()
+
+        async def stream(self, request: ModelRequest, *, deadline_at: datetime):  # type: ignore[no-untyped-def]
+            del request, deadline_at
+            yield ModelStreamEvent(sequence=1, type=ModelStreamEventType.TEXT_DELTA, text_delta="x")
+            await asyncio.sleep(60)
+
+    client = ResilientModelClient(StreamingClient(), max_concurrency=1, circuit_breaker=breaker, now=lambda: NOW)
+
+    async def scenario() -> None:
+        iterator = client.stream(_request(), deadline_at=NOW + timedelta(seconds=5))
+        assert (await anext(iterator)).text_delta == "x"
+        await cast(Any, iterator).aclose()
+        breaker.before_call()
+        breaker.record_success()
+
+    asyncio.run(scenario())
+
+
+def test_stream_buffers_completed_event_until_upstream_cleanup_and_releases_semaphore() -> None:
+    cleaned = asyncio.Event()
+
+    class StreamingClient:
+        async def complete(self, request: ModelRequest, *, deadline_at: datetime) -> ModelResponse:
+            del request, deadline_at
+            return _response()
+
+        async def stream(self, request: ModelRequest, *, deadline_at: datetime):  # type: ignore[no-untyped-def]
+            del request, deadline_at
+            try:
+                yield ModelStreamEvent(sequence=1, type=ModelStreamEventType.COMPLETED, response=_response())
+            finally:
+                cleaned.set()
+
+    async def scenario() -> None:
+        client = ResilientModelClient(StreamingClient(), max_concurrency=1, now=lambda: NOW)
+        iterator = client.stream(_request(), deadline_at=NOW + timedelta(seconds=5))
+        event = await anext(iterator)
+        assert event.type is ModelStreamEventType.COMPLETED
+        assert cleaned.is_set()
+        response = await client.complete(_request(), deadline_at=NOW + timedelta(seconds=5))
+        assert response.request_id == "request-id"
+
+    asyncio.run(scenario())
 
 
 def test_global_semaphore_bounds_concurrent_gateway_calls() -> None:

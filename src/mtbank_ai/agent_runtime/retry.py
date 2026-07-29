@@ -99,6 +99,11 @@ class CircuitBreaker:
         if self._failure_count >= self._policy.failure_threshold:
             self._open()
 
+    def record_aborted(self) -> None:
+        """Release a half-open lease without treating caller cancellation as provider health."""
+        if self._state is CircuitState.HALF_OPEN:
+            self._half_open_in_flight = False
+
     def _open(self) -> None:
         self._state = CircuitState.OPEN
         self._opened_at = self._clock()
@@ -147,25 +152,34 @@ class ResilientModelClient:
             await asyncio.wait_for(self._semaphore.acquire(), timeout=_remaining_seconds(deadline_at, self._now))
         except TimeoutError:
             raise AgentRuntimeError(AgentFailureCode.DEADLINE_EXCEEDED) from None
-        emitted = False
+        admitted = False
+        completed_event: ModelStreamEvent | None = None
         try:
             self._circuit_breaker.before_call()
+            admitted = True
             async for event in stream(request, deadline_at=deadline_at):  # type: ignore[reportGeneralTypeIssues]
-                emitted = True
-                yield event
+                if event.type.value == "completed":
+                    completed_event = event
+                else:
+                    yield event
+            if completed_event is None:
+                raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE)
             self._circuit_breaker.record_success()
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, GeneratorExit):
+            if admitted:
+                self._circuit_breaker.record_aborted()
             raise
-        except AgentRuntimeError:
-            if not emitted:
+        except AgentRuntimeError as error:
+            if admitted and error.code is not AgentFailureCode.CIRCUIT_OPEN:
                 self._circuit_breaker.record_failure()
             raise
         except Exception:
-            if not emitted:
+            if admitted:
                 self._circuit_breaker.record_failure()
             raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE) from None
         finally:
             self._semaphore.release()
+        yield completed_event
 
     async def complete(self, request: ModelRequest, *, deadline_at: datetime) -> ModelResponse:
         try:

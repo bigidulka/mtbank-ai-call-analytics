@@ -380,6 +380,15 @@ def test_runtime_rejects_budget_deadline_and_missing_terminal() -> None:
     assert deadline_error.value.code is AgentFailureCode.DEADLINE_EXCEEDED
 
 
+def test_runtime_rejects_terminal_batched_with_first_required_retrieval() -> None:
+    client = ScriptedClient((_response(_call("retrieve", call_id="read"), _call("submit", call_id="submit")),))
+
+    with pytest.raises(AgentRuntimeError) as error:
+        asyncio.run(_runtime(client, _registry()).run(_spec(), _context()))
+
+    assert error.value.code is AgentFailureCode.REQUIRED_RETRIEVAL_MISSING
+
+
 def test_runtime_rejects_tool_timeout_and_model_fallback() -> None:
     timeout_client = ScriptedClient((_response(_call("retrieve")),))
     with pytest.raises(AgentRuntimeError) as timeout_error:
@@ -434,6 +443,43 @@ def test_runtime_runs_multiple_allowed_reads_in_parallel_and_preserves_provider_
     assert all(request.tool_choice.value == "auto" for request in client.requests)
     tool_messages = [message for message in client.requests[1].messages if message.role is MessageRole.TOOL]
     assert [message.tool_call_id for message in tool_messages] == ["first-call", "second-call"]
+
+
+def test_parallel_read_failure_cancels_blocking_sibling() -> None:
+    sibling_cancelled = asyncio.Event()
+
+    async def fails(arguments: ToolInput, context: object) -> AgentOutput:
+        del arguments, context
+        raise RuntimeError("failed")
+
+    async def blocks(arguments: ToolInput, context: object) -> AgentOutput:
+        del arguments, context
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            sibling_cancelled.set()
+            raise
+        return AgentOutput(value="unreachable")
+
+    async def submit(arguments: ToolInput, context: object) -> AgentOutput:
+        del context
+        return AgentOutput(value=arguments.value)
+
+    registry = ToolRegistry(
+        (
+            ToolSpec("fails", "Fail.", ToolInput, AgentOutput, ToolSideEffect.READ_ONLY, 1, fails),
+            ToolSpec("blocks", "Block.", ToolInput, AgentOutput, ToolSideEffect.READ_ONLY, 1, blocks),
+            ToolSpec("submit", "Submit.", ToolInput, AgentOutput, ToolSideEffect.TERMINAL_SUBMIT, 1, submit),
+        )
+    )
+    spec = _spec(allowed_read_tools=("fails", "blocks"), required_retrieval_tools=("fails",))
+    client = ScriptedClient((_response(_call("fails", call_id="fail"), _call("blocks", call_id="block")),))
+
+    with pytest.raises(AgentRuntimeError) as error:
+        asyncio.run(_runtime(client, registry).run(spec, _context()))
+
+    assert error.value.code is AgentFailureCode.TOOL_EXECUTION_FAILED
+    assert sibling_cancelled.is_set()
 
 
 def test_runtime_rejects_repeated_tool_cycle_before_handler() -> None:

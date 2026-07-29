@@ -24,7 +24,6 @@ from mtbank_ai.agent_runtime.contracts import (
     ModelStreamEvent,
     ModelStreamEventType,
     ModelToolCall,
-    ModelToolCallDelta,
     ModelUsage,
 )
 from mtbank_ai.agent_runtime.retry import CircuitBreaker, CircuitBreakerPolicy, ResilientModelClient, RetryPolicy
@@ -244,6 +243,8 @@ class OpenAICompatibleProvider:
         usage: ModelUsage | None = None
         text_parts: list[str] = []
         tool_parts: dict[int, _ToolCallParts] = {}
+        text_chars = 0
+        tool_event_count = 0
         try:
             async for chunk in stream:
                 model_id = _stream_model_id(model_id, chunk)
@@ -262,6 +263,9 @@ class OpenAICompatibleProvider:
                     delta = getattr(choice, "delta", None)
                     content = getattr(delta, "content", None)
                     if isinstance(content, str) and content:
+                        text_chars += len(content)
+                        if text_chars > 20_000:
+                            raise ValueError("stream text exceeded contract bound")
                         text_parts.append(content)
                         sequence += 1
                         yield ModelStreamEvent(
@@ -273,6 +277,9 @@ class OpenAICompatibleProvider:
                         index = getattr(raw_call, "index", None)
                         if not isinstance(index, int) or index < 0:
                             raise ValueError("stream tool call index is invalid")
+                        tool_event_count += 1
+                        if index >= 24 or tool_event_count > 256:
+                            raise ValueError("stream tool-call fragments exceeded bound")
                         parts = tool_parts.setdefault(index, _ToolCallParts())
                         raw_id = getattr(raw_call, "id", None)
                         if raw_id is not None:
@@ -285,18 +292,7 @@ class OpenAICompatibleProvider:
                         if arguments_delta is not None:
                             if not isinstance(arguments_delta, str):
                                 raise ValueError("stream tool arguments are invalid")
-                            parts.arguments.append(arguments_delta)
-                        sequence += 1
-                        yield ModelStreamEvent(
-                            sequence=sequence,
-                            type=ModelStreamEventType.TOOL_CALL_DELTA,
-                            tool_call_delta=ModelToolCallDelta(
-                                index=index,
-                                id=parts.id,
-                                name=parts.name,
-                                arguments_delta=arguments_delta,
-                            ),
-                        )
+                            parts.append_arguments(arguments_delta)
             if model_id is None or usage is None:
                 raise ValueError("stream provider omitted model or usage")
             if usage.output_tokens > request.max_output_tokens:
@@ -355,6 +351,7 @@ class _ToolCallParts:
         self.id: str | None = None
         self.name: str | None = None
         self.arguments: list[str] = []
+        self.arguments_chars = 0
 
     def set_id(self, value: str) -> None:
         if self.id is not None and self.id != value:
@@ -365,6 +362,12 @@ class _ToolCallParts:
         if self.name is not None and self.name != value:
             raise ValueError("stream tool call name changed")
         self.name = value
+
+    def append_arguments(self, value: str) -> None:
+        self.arguments_chars += len(value)
+        if self.arguments_chars > 65_536:
+            raise ValueError("stream tool arguments exceeded contract bound")
+        self.arguments.append(value)
 
     def complete(self, index: int) -> ModelToolCall:
         if self.id is None or self.name is None or not self.arguments:

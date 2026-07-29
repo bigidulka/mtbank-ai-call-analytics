@@ -344,7 +344,14 @@ class BoundedAgentRuntime:
         }
         if not tasks:
             return {}
-        results = await asyncio.gather(*tasks.values())
+        try:
+            results = await asyncio.gather(*tasks.values())
+        except BaseException:
+            for task in tasks.values():
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks.values(), return_exceptions=True)
+            raise
         return dict(zip(tasks, results, strict=True))
 
     async def _execute_tool(
