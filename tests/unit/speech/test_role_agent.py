@@ -18,15 +18,15 @@ CLIENT_ID = UUID("22222222-2222-4222-8222-222222222222")
 
 
 class Provider:
-    def __init__(self, response: ModelResponse) -> None:
-        self.response = response
+    def __init__(self, response: ModelResponse, *additional_responses: ModelResponse) -> None:
+        self.responses = [response, *additional_responses]
         self.requests = []
         self.deadlines = []
 
     def complete(self, request, *, deadline_at):  # type: ignore[no-untyped-def]
         self.requests.append(request)
         self.deadlines.append(deadline_at)
-        return self.response
+        return self.responses.pop(0)
 
     def close(self) -> None:
         return None
@@ -124,6 +124,47 @@ def test_role_agent_uses_one_required_terminal_tool_and_returns_grounded_roles()
 def test_role_agent_rejects_model_drift_and_text_completion(response: ModelResponse) -> None:
     with pytest.raises(SpeechProviderError, match="invalid terminal response"):
         LlmRoleResolver(_settings(), provider=Provider(response)).resolve(_candidates())
+
+
+def test_role_agent_retries_once_when_provider_returns_invalid_typed_output() -> None:
+    valid = _response(
+        {
+            "roles": [
+                {
+                    "original_speaker_id": "speaker-a",
+                    "role": "Оператор",
+                    "confidence": 0.91,
+                    "evidence": "приветствие оператора",
+                    "evidence_segment_ids": [str(OPERATOR_ID)],
+                },
+                {
+                    "original_speaker_id": "speaker-b",
+                    "role": "Клиент",
+                    "confidence": 0.88,
+                    "evidence": "запрос клиента",
+                    "evidence_segment_ids": [str(CLIENT_ID)],
+                },
+            ],
+            "agent_provenance": None,
+        }
+    )
+    provider = Provider(_response({"roles": [{"original_speaker_id": "speaker-a"}]}), valid)
+
+    decision = LlmRoleResolver(_settings(), provider=provider).resolve(_candidates())
+
+    assert len(decision.roles) == 2
+    assert len(provider.requests) == 2
+    assert "Предыдущий JSON не прошёл схему" in provider.requests[1].messages[-1].content
+
+
+def test_role_agent_rejects_second_invalid_typed_output() -> None:
+    invalid = _response({"roles": [{"original_speaker_id": "speaker-a"}]})
+    provider = Provider(invalid, invalid)
+
+    with pytest.raises(SpeechProviderError, match="invalid typed output"):
+        LlmRoleResolver(_settings(), provider=provider).resolve(_candidates())
+
+    assert len(provider.requests) == 2
 
 
 def test_role_agent_returns_empty_typed_decision_when_input_exceeds_bound() -> None:

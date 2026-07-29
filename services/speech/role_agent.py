@@ -148,7 +148,15 @@ class LlmRoleResolver:
         try:
             submitted = RoleResolutionDecision.model_validate_json(call.arguments_json, strict=True)
         except ValidationError as error:
-            raise SpeechProviderError("role agent returned invalid typed output") from error
+            repaired = self._retry_invalid_output(
+                prompt_text=prompt.text,
+                payload=payload,
+                tool=tool,
+                invalid_arguments=call.arguments_json,
+            )
+            if repaired is None:
+                raise SpeechProviderError("role agent returned invalid typed output") from error
+            submitted = repaired
         return submitted.model_copy(
             update={
                 "agent_provenance": RoleAgentProvenance(
@@ -160,6 +168,46 @@ class LlmRoleResolver:
                 )
             }
         )
+
+    def _retry_invalid_output(
+        self,
+        *,
+        prompt_text: str,
+        payload: str,
+        tool: FunctionToolSchema,
+        invalid_arguments: str,
+    ) -> RoleResolutionDecision | None:
+        response = self._provider.complete(
+            ModelRequest(
+                model_id=self._settings.model,
+                messages=(
+                    ModelMessage(role=MessageRole.SYSTEM, content=prompt_text),
+                    ModelMessage(role=MessageRole.USER, content=payload),
+                    ModelMessage(
+                        role=MessageRole.USER,
+                        content=(
+                            "Предыдущий JSON не прошёл схему. Исправь его и вызови "
+                            f"{_TOOL_NAME} ещё раз. Не добавляй текст. Невалидный JSON: "
+                            f"{invalid_arguments[: self._settings.max_input_chars // 2]}"
+                        ),
+                    ),
+                ),
+                tools=(tool,),
+                tool_choice=ToolChoice.REQUIRED,
+                max_output_tokens=self._settings.max_output_tokens,
+                temperature=0.0,
+            ),
+            deadline_at=datetime.now(UTC) + timedelta(seconds=self._settings.timeout_seconds),
+        )
+        if response.model_id != self._settings.model or response.has_text_content or len(response.tool_calls) != 1:
+            return None
+        call = response.tool_calls[0]
+        if call.name != _TOOL_NAME:
+            return None
+        try:
+            return RoleResolutionDecision.model_validate_json(call.arguments_json, strict=True)
+        except ValidationError:
+            return None
 
     def close(self) -> None:
         self._provider.close()
