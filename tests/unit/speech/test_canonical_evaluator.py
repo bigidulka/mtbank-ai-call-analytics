@@ -122,6 +122,22 @@ def test_canonical_evaluator_retries_transient_service_failure(tmp_path: Path) -
     assert error.value.status_code == 502
 
 
+def test_canonical_evaluator_retries_transient_provider_failure(tmp_path: Path) -> None:
+    responses = iter((httpx.Response(502), httpx.Response(409)))
+    transport = httpx.MockTransport(lambda _request: next(responses))
+    with httpx.Client(transport=transport) as client:
+        with pytest.raises(CanonicalEvaluationFailure, match="role_resolution_required") as error:
+            _evaluate_entry(
+                client,
+                "http://speech.test/v1/transcribe",
+                _entry(tmp_path),
+                transient_retries=1,
+                retry_delay_seconds=0,
+            )
+
+    assert error.value.status_code == 409
+
+
 def test_canonical_evaluator_reports_role_resolution_failure_without_parsing_body(tmp_path: Path) -> None:
     transport = httpx.MockTransport(lambda _request: httpx.Response(409, text="do not store"))
     with httpx.Client(transport=transport) as client:

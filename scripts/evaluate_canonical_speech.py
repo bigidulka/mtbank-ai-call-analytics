@@ -200,7 +200,7 @@ def _evaluate_entry(
                 files={"file": (entry.path.name, audio, content_type)},
                 headers=headers,
             )
-        if response.status_code not in {429, 500, 503, 504} or attempt == transient_retries:
+        if response.status_code not in {429, 500, 502, 503, 504} or attempt == transient_retries:
             break
         time.sleep(retry_delay_seconds * (attempt + 1))
     assert response is not None
