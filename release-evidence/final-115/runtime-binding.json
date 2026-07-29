@@ -1,0 +1,22 @@
+{
+    "schema_version": "1",
+    "kind": "configured-remote-speech-runtime",
+    "speech_backend_url_sha256": "4faae2cc94dd5252e3a43ba27fd91ce58c7bcf47581ebb60edd28e0e59c32665",
+    "runtime": {
+        "device": "cuda",
+        "compute_type": "float16",
+        "asr": {
+            "package": "faster-whisper",
+            "package_version": "1.2.1",
+            "model_id": "dropbox-dash/faster-whisper-large-v3-turbo",
+            "model_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+        },
+        "diarization": {
+            "package": "pyannote.audio",
+            "package_version": "4.0.7",
+            "model_id": "pyannote/speaker-diarization-community-1",
+            "model_revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee"
+        },
+        "image_digest": "sha256:9fbfa02a6ba975d705a98bcf5651ac4ae9d86d8523846f9bce68bed552cc0a81"
+    }
+}

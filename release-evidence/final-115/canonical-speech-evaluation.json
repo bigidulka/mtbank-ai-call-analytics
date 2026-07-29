@@ -4,13 +4,13 @@
   "canonical_speech_path": true,
   "status": "completed",
   "manifest_sha256": "a520a33d5df53ccd96c2998586711bc865d644492e37d93eb0bfc6f23bc9df08",
-  "endpoint_sha256": "4b47f9a2f479a3903064780be46af495c26814e823acaa18b4b0dedde3323ea6",
+  "endpoint_sha256": "b0e40ac06bc64c848448ab084f571e1fb664b41cc018aa575810d59c8e5206b7",
   "files": [
     {
       "id": "synthetic-credit-consultation",
       "audio_sha256": "a44a6a2e22907a1070cc8c0552c6f2871e82141c6c993601fa79b129361f15cd",
       "reference_sha256": "f7220b6951c586af6a7a7bdd2c72470a5a8de2285cdfdb7f4f1249d019320f52",
-      "hypothesis_sha256": "84fcd0f898251befcf14673c8b2021d55d227fda175041d22af090c3606c5088",
+      "hypothesis_sha256": "f79727d7a73e51bba6f68f45adb88b4824f0f0da174b49ac501bcd2e522131ce",
       "transcript_revision": "speech/local-faster-whisper-v1",
       "component_revisions": {
         "asr": {
@@ -35,28 +35,28 @@
           "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
         }
       },
-      "latency_ms": 9796.685,
+      "latency_ms": 35866.927,
       "metrics": {
         "wer": {
-          "wer": 0.08888888888888889,
+          "wer": 0.10555555555555556,
           "substitutions": 9,
           "deletions": 13,
-          "insertions": 10,
+          "insertions": 16,
           "reference_words": 360
         },
         "der": {
-          "der": 0.19110482696830522,
-          "miss_seconds": 30.591999999999956,
-          "false_alarm_seconds": 7.096999999999973,
+          "der": 0.1903208645984988,
+          "miss_seconds": 30.69799999999995,
+          "false_alarm_seconds": 6.8229999999999436,
           "confusion_seconds": 3.26400000000001,
           "reference_speaker_seconds": 214.29600000000002
         },
-        "time_weighted_role_accuracy": 0.8420129167133314,
+        "time_weighted_role_accuracy": 0.8415182737895252,
         "speaker_attributed_wer": {
-          "wer": 0.08888888888888889,
+          "wer": 0.10555555555555556,
           "substitutions": 9,
           "deletions": 13,
-          "insertions": 10,
+          "insertions": 16,
           "reference_words": 360
         }
       }
@@ -90,7 +90,7 @@
           "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
         }
       },
-      "latency_ms": 4360.902,
+      "latency_ms": 3882.849,
       "metrics": {
         "wer": {
           "wer": 0.05263157894736842,
@@ -145,7 +145,7 @@
           "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
         }
       },
-      "latency_ms": 3893.39,
+      "latency_ms": 3691.859,
       "metrics": {
         "wer": {
           "wer": 0.06097560975609756,
@@ -200,7 +200,7 @@
           "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
         }
       },
-      "latency_ms": 4096.921,
+      "latency_ms": 3656.453,
       "metrics": {
         "wer": {
           "wer": 0.04819277108433735,
@@ -255,7 +255,7 @@
           "artifact_sha256": "2c932a16ae7abd44531be8f959cafb0da43fa26d190b71be212bb878189a7a18"
         }
       },
-      "latency_ms": 4942.563,
+      "latency_ms": 11593.96,
       "metrics": {
         "wer": {
           "wer": 0.06285714285714286,
@@ -265,9 +265,9 @@
           "reference_words": 175
         },
         "der": {
-          "der": 0.21668093607305958,
+          "der": 0.21596746575342501,
           "miss_seconds": 18.38800000000002,
-          "false_alarm_seconds": 4.882000000000012,
+          "false_alarm_seconds": 4.802000000000028,
           "confusion_seconds": 1.0259999999999962,
           "reference_speaker_seconds": 112.12800000000001
         },
@@ -284,25 +284,25 @@
   ],
   "micro": {
     "wer": {
-      "wer": 0.06756756756756757,
+      "wer": 0.07335907335907337,
       "substitutions": 31,
       "deletions": 13,
-      "insertions": 26,
+      "insertions": 32,
       "reference_words": 1036
     },
     "der": {
-      "der": 0.20343109321379269,
-      "miss_seconds": 93.43399999999993,
-      "false_alarm_seconds": 27.359999999999992,
+      "der": 0.20303853410832087,
+      "miss_seconds": 93.53999999999992,
+      "false_alarm_seconds": 27.00599999999998,
       "confusion_seconds": 7.724000000000018,
       "reference_speaker_seconds": 631.752
     },
-    "time_weighted_role_accuracy": 0.8398770403576088,
+    "time_weighted_role_accuracy": 0.839709252998012,
     "speaker_attributed_wer": {
-      "wer": 0.06756756756756757,
+      "wer": 0.07335907335907337,
       "substitutions": 31,
       "deletions": 13,
-      "insertions": 26,
+      "insertions": 32,
       "reference_words": 1036
     }
   }

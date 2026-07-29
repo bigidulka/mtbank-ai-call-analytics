@@ -6,10 +6,10 @@
   "audio_seconds": 300.0,
   "endpoint_sha256": "7696cd60a6366ba201388929987b6c697222dd9c9ee1fc5adb19775fc02a8cab",
   "status_code": 200,
-  "latency_ms": 35979.46,
+  "latency_ms": 27880.197,
   "status": "completed",
   "component_metadata": {
-    "code_sha": "df6e1e79dd2192cf399ce83cd234c8ea54c40860-dirty",
+    "code_sha": "f3903c3e1292bcc2b0f634a43f659af45db48da9",
     "asr": {
       "model_revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
     },
