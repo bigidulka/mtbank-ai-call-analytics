@@ -17,6 +17,7 @@ from mtbank_ai.agent_runtime import (
     MessageRole,
     ModelMessage,
     ModelRequest,
+    ModelToolCall,
     OpenAICompatibleProvider,
     ProviderError,
     ToolChoice,
@@ -65,22 +66,36 @@ class FakeStream:
 
 
 class StreamingFakeClient:
-    def __init__(self) -> None:
+    def __init__(self, streams: tuple[FakeStream, ...] | None = None) -> None:
         self.calls: list[dict[str, Any]] = []
-        self.streams: list[FakeStream] = []
+        self.streams = list(
+            streams
+            or (
+                FakeStream(
+                    (
+                        SimpleNamespace(
+                            model="configured-model",
+                            usage=SimpleNamespace(prompt_tokens=2, completion_tokens=3, total_tokens=5),
+                        ),
+                    )
+                ),
+                FakeStream(
+                    (
+                        SimpleNamespace(
+                            model="configured-model",
+                            usage=SimpleNamespace(prompt_tokens=2, completion_tokens=3, total_tokens=5),
+                        ),
+                    )
+                ),
+            )
+        )
+        self._next_stream = 0
         self.chat = SimpleNamespace(completions=self)
 
     async def create(self, **kwargs: object) -> FakeStream:
         self.calls.append(kwargs)
-        stream = FakeStream(
-            (
-                SimpleNamespace(
-                    model="configured-model",
-                    usage=SimpleNamespace(prompt_tokens=2, completion_tokens=3, total_tokens=5),
-                ),
-            )
-        )
-        self.streams.append(stream)
+        stream = self.streams[self._next_stream]
+        self._next_stream += 1
         return stream
 
     async def close(self) -> None:
@@ -195,6 +210,134 @@ def test_provider_forwards_reasoning_effort_only_when_configured(
             assert payload["reasoning_effort"] == reasoning_effort
     assert streaming_result.limit_enforced is True
     assert streaming_client.streams[1].closed is True
+
+
+def test_provider_stream_assembles_fragmented_text_and_tool_calls_and_closes_stream() -> None:
+    stream = FakeStream(
+        (
+            SimpleNamespace(
+                id="request-1",
+                model="configured-model",
+                choices=(
+                    SimpleNamespace(
+                        finish_reason=None,
+                        delta=SimpleNamespace(content="Привет", tool_calls=()),
+                    ),
+                ),
+                usage=None,
+            ),
+            SimpleNamespace(
+                id="request-1",
+                model="configured-model",
+                choices=(
+                    SimpleNamespace(
+                        finish_reason=None,
+                        delta=SimpleNamespace(
+                            content=None,
+                            tool_calls=(
+                                SimpleNamespace(
+                                    index=0,
+                                    id="call-1",
+                                    function=SimpleNamespace(name="lookup", arguments='{"x":'),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                usage=None,
+            ),
+            SimpleNamespace(
+                id="request-1",
+                model="configured-model",
+                choices=(
+                    SimpleNamespace(
+                        finish_reason="tool_calls",
+                        delta=SimpleNamespace(
+                            content="!",
+                            tool_calls=(
+                                SimpleNamespace(
+                                    index=0,
+                                    id=None,
+                                    function=SimpleNamespace(name=None, arguments='"safe"}'),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+                usage=SimpleNamespace(prompt_tokens=2, completion_tokens=3, total_tokens=5),
+            ),
+        )
+    )
+    client = StreamingFakeClient((stream,))
+    provider = OpenAICompatibleProvider(_settings(), client=client, now=lambda: NOW, monotonic=lambda: 1.0)
+
+    async def consume():
+        return [event async for event in provider.stream(_request(), deadline_at=NOW + timedelta(seconds=10))]
+
+    events = asyncio.run(consume())
+
+    assert [event.type.value for event in events] == [
+        "text_delta",
+        "tool_call_delta",
+        "text_delta",
+        "tool_call_delta",
+        "completed",
+    ]
+    response = events[-1].response
+    assert response is not None
+    assert response.text_content == "Привет!"
+    assert response.tool_calls == (ModelToolCall(id="call-1", name="lookup", arguments_json='{"x":"safe"}'),)
+    assert stream.closed is True
+    assert client.calls[0]["stream"] is True
+
+
+def test_provider_stream_rejects_model_drift_and_closes_stream() -> None:
+    stream = FakeStream(
+        (
+            SimpleNamespace(id="request-1", model="configured-model", choices=(), usage=None),
+            SimpleNamespace(
+                id="request-1",
+                model="unexpected-model",
+                choices=(),
+                usage=SimpleNamespace(prompt_tokens=2, completion_tokens=3, total_tokens=5),
+            ),
+        )
+    )
+    provider = OpenAICompatibleProvider(_settings(), client=StreamingFakeClient((stream,)), now=lambda: NOW)
+
+    async def consume() -> None:
+        async for _event in provider.stream(_request(), deadline_at=NOW + timedelta(seconds=10)):
+            pass
+
+    with pytest.raises(ProviderError) as error:
+        asyncio.run(consume())
+
+    assert error.value.code is AgentFailureCode.MALFORMED_PROVIDER_RESPONSE
+    assert stream.closed is True
+
+
+def test_provider_stream_closes_on_consumer_cancellation() -> None:
+    class BlockingStream(FakeStream):
+        async def __anext__(self) -> object:
+            await asyncio.sleep(60)
+            raise StopAsyncIteration
+
+    stream = BlockingStream(())
+    provider = OpenAICompatibleProvider(_settings(), client=StreamingFakeClient((stream,)), now=lambda: NOW)
+
+    async def consume_then_cancel() -> None:
+        async def next_event() -> None:
+            await anext(provider.stream(_request(), deadline_at=NOW + timedelta(seconds=10)))
+
+        task = asyncio.create_task(next_event())
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(consume_then_cancel())
+
+    assert stream.closed is True
 
 
 def test_model_request_rejects_max_reasoning_effort() -> None:

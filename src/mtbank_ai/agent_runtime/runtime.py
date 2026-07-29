@@ -24,11 +24,12 @@ from mtbank_ai.agent_runtime.contracts import (
     SanitizedAgentEvidence,
     SanitizedTrajectoryRecord,
     ToolCallStatus,
+    ToolChoice,
     ToolExecutionContext,
 )
 from mtbank_ai.agent_runtime.events import EventSink, LifecycleRecorder
 from mtbank_ai.agent_runtime.retry import ModelClient
-from mtbank_ai.agent_runtime.tools import ToolRegistry
+from mtbank_ai.agent_runtime.tools import ExecutedToolCall, ToolRegistry, ValidatedToolCall
 from mtbank_ai.domain.events import LifecycleEventType, RunEvent
 from mtbank_ai.observability import Telemetry
 
@@ -36,7 +37,7 @@ EventRecorder = Callable[..., Awaitable[RunEvent]]
 
 
 class BoundedAgentRuntime:
-    """Выполняет не более трёх model turns и завершает только terminal tool output."""
+    """Выполняет bounded autonomous model/tool loop и завершает только typed terminal output."""
 
     def __init__(
         self,
@@ -58,6 +59,7 @@ class BoundedAgentRuntime:
     async def run(self, spec: AgentSpec, context: AgentRunContext) -> AgentResult:
         recorder = LifecycleRecorder(run_id=context.run_id, sink=self._event_sink, now=self._now)
         trajectory: list[SanitizedTrajectoryRecord] = []
+        record_lock = asyncio.Lock()
 
         async def record(
             event_type: LifecycleEventType,
@@ -71,22 +73,23 @@ class BoundedAgentRuntime:
             usage: ModelUsage | None = None,
             latency_ms: int | None = None,
         ) -> RunEvent:
-            event = await recorder.record(event_type, payload=payload)
-            trajectory.append(
-                SanitizedTrajectoryRecord(
-                    sequence=event.sequence,
-                    event_type=event.event_type,
-                    event_hash=event.current_hash,
-                    model_id=model_id,
-                    model_call_id=model_call_id,
-                    tool_call_id=tool_call_id,
-                    tool_name=tool_name,
-                    status=status,
-                    usage=usage,
-                    latency_ms=latency_ms,
+            async with record_lock:
+                event = await recorder.record(event_type, payload=payload)
+                trajectory.append(
+                    SanitizedTrajectoryRecord(
+                        sequence=event.sequence,
+                        event_type=event.event_type,
+                        event_hash=event.current_hash,
+                        model_id=model_id,
+                        model_call_id=model_call_id,
+                        tool_call_id=tool_call_id,
+                        tool_name=tool_name,
+                        status=status,
+                        usage=usage,
+                        latency_ms=latency_ms,
+                    )
                 )
-            )
-            return event
+                return event
 
         try:
             return await self._run(spec, context, record, trajectory)
@@ -145,6 +148,8 @@ class BoundedAgentRuntime:
         total_output_tokens = 0
         terminal_submitted = False
         seen_remote_tool_call_ids: set[str] = set()
+        tool_call_count = 0
+        repeated_calls: dict[str, int] = {}
 
         for turn in range(spec.budget.max_turns):
             model_call_id = f"model-{turn + 1}"
@@ -152,15 +157,12 @@ class BoundedAgentRuntime:
             if remaining_output_tokens <= 0:
                 raise AgentRuntimeError(AgentFailureCode.BUDGET_EXCEEDED)
             self._require_remaining(context.deadline_at)
-            missing_retrieval_tools = tuple(
-                name for name in spec.required_retrieval_tools if name not in retrieved_tools
-            )
-            available_tool_names = missing_retrieval_tools if missing_retrieval_tools else (spec.terminal_submit_tool,)
             request = ModelRequest(
                 model_id=spec.model_id,
                 reasoning_effort=spec.reasoning_effort,
                 messages=tuple(messages),
-                tools=self._tool_registry.function_schemas(available_tool_names),
+                tools=self._tool_registry.function_schemas((*spec.allowed_read_tools, spec.terminal_submit_tool)),
+                tool_choice=ToolChoice.AUTO,
                 max_output_tokens=remaining_output_tokens,
             )
             await record(
@@ -217,6 +219,14 @@ class BoundedAgentRuntime:
                 response.tool_calls,
                 seen_remote_call_ids=seen_remote_tool_call_ids,
             )
+            tool_call_count += len(validated_calls)
+            if tool_call_count > spec.budget.max_tool_calls:
+                raise AgentRuntimeError(AgentFailureCode.TOOL_LOOP_GUARD)
+            for validated in validated_calls:
+                signature = _tool_signature(validated.spec.name, validated.arguments)
+                repeated_calls[signature] = repeated_calls.get(signature, 0) + 1
+                if repeated_calls[signature] > spec.budget.max_repeated_tool_calls:
+                    raise AgentRuntimeError(AgentFailureCode.TOOL_LOOP_GUARD)
             local_tool_call_ids = tuple(f"tool-{turn + 1}-{index + 1}" for index in range(len(validated_calls)))
             for validated, tool_call_id in zip(validated_calls, local_tool_call_ids, strict=True):
                 await record(
@@ -249,98 +259,20 @@ class BoundedAgentRuntime:
                 )
 
             messages.append(ModelMessage(role=MessageRole.ASSISTANT, tool_calls=response.tool_calls))
-            for index, validated in enumerate(validated_calls):
-                tool_call_id = local_tool_call_ids[index]
-                remaining = self._require_remaining(context.deadline_at)
-                timeout_seconds = min(validated.spec.timeout_seconds, remaining)
-                await record(
-                    LifecycleEventType.TOOL_STARTED,
-                    payload={"tool_call_id": tool_call_id, "tool_name": validated.spec.name},
-                    tool_call_id=tool_call_id,
-                    tool_name=validated.spec.name,
-                )
-                try:
-                    executed = await self._tool_registry.execute(
-                        validated,
-                        ToolExecutionContext(
-                            run_id=context.run_id,
-                            agent_id=spec.agent_id,
-                            deadline_at=context.deadline_at,
-                        ),
-                        timeout_seconds=timeout_seconds,
-                        max_observation_bytes=spec.budget.max_observation_bytes,
-                        include_observation=index != terminal_index,
-                    )
-                except AgentRuntimeError:
-                    await record(
-                        LifecycleEventType.TOOL_FAILED,
-                        payload={"tool_call_id": tool_call_id, "tool_name": validated.spec.name},
-                        tool_call_id=tool_call_id,
-                        tool_name=validated.spec.name,
-                        status=ToolCallStatus.FAILED,
-                    )
-                    raise
-                completed_payload: dict[str, str | int | float | bool | None] = {
-                    "tool_call_id": tool_call_id,
-                    "tool_name": validated.spec.name,
-                }
-                if executed.observation is not None:
-                    completed_payload["observation_hash"] = executed.observation.observation_hash
-                    completed_payload["observation_bytes"] = executed.observation.size_bytes
-                await record(
-                    LifecycleEventType.TOOL_COMPLETED,
-                    payload=completed_payload,
-                    tool_call_id=tool_call_id,
-                    tool_name=validated.spec.name,
-                    status=ToolCallStatus.COMPLETED,
-                )
+            read_calls = tuple(
+                (index, validated) for index, validated in enumerate(validated_calls) if index != terminal_index
+            )
+            read_results = await self._execute_read_calls(
+                read_calls,
+                local_tool_call_ids=local_tool_call_ids,
+                context=context,
+                spec=spec,
+                record=record,
+            )
+            for index, validated in read_calls:
+                executed = read_results[index]
                 if validated.spec.name in spec.required_retrieval_tools:
                     retrieved_tools.add(validated.spec.name)
-
-                if index == terminal_index:
-                    terminal_submitted = True
-                    output = _validate_terminal_output(spec, executed.output)
-                    await record(
-                        LifecycleEventType.AGENT_OUTPUT_VALIDATED,
-                        payload={"agent_id": spec.agent_id, "terminal_tool": validated.spec.name},
-                        tool_call_id=tool_call_id,
-                        tool_name=validated.spec.name,
-                    )
-                    await record(
-                        LifecycleEventType.RUN_COMPLETED,
-                        payload={"agent_id": spec.agent_id, "model_id": spec.model_id},
-                        model_id=spec.model_id,
-                    )
-                    sanitized_trajectory = tuple(trajectory)
-                    evidence = SanitizedAgentEvidence(
-                        run_id=context.run_id,
-                        run_version=context.run_version,
-                        agent_id=spec.agent_id,
-                        model_id=spec.model_id,
-                        model_version=spec.model_version,
-                        reasoning_effort=spec.reasoning_effort,
-                        policy_version=spec.policy_version,
-                        prompt=spec.prompt,
-                        usage=usage,
-                        cost_usd=cost_usd,
-                        trajectory=sanitized_trajectory,
-                    )
-                    return AgentResult(
-                        run_id=context.run_id,
-                        run_version=context.run_version,
-                        agent_id=spec.agent_id,
-                        model_id=spec.model_id,
-                        model_version=spec.model_version,
-                        reasoning_effort=spec.reasoning_effort,
-                        policy_version=spec.policy_version,
-                        prompt=spec.prompt,
-                        output=output,
-                        usage=usage,
-                        cost_usd=cost_usd,
-                        trajectory=sanitized_trajectory,
-                        evidence=evidence,
-                    )
-
                 if executed.observation is None:
                     raise AgentRuntimeError(AgentFailureCode.UNEXPECTED_RUNTIME_FAILURE)
                 messages.append(
@@ -351,9 +283,122 @@ class BoundedAgentRuntime:
                     )
                 )
 
+            if terminal_index is not None:
+                validated = validated_calls[terminal_index]
+                tool_call_id = local_tool_call_ids[terminal_index]
+                executed = await self._execute_tool(
+                    validated,
+                    tool_call_id=tool_call_id,
+                    context=context,
+                    spec=spec,
+                    record=record,
+                    include_observation=False,
+                )
+                terminal_submitted = True
+                output = _validate_terminal_output(spec, executed.output)
+                await record(
+                    LifecycleEventType.AGENT_OUTPUT_VALIDATED,
+                    payload={"agent_id": spec.agent_id, "terminal_tool": validated.spec.name},
+                    tool_call_id=tool_call_id,
+                    tool_name=validated.spec.name,
+                )
+                await record(
+                    LifecycleEventType.RUN_COMPLETED,
+                    payload={"agent_id": spec.agent_id, "model_id": spec.model_id},
+                    model_id=spec.model_id,
+                )
+                return _agent_result(
+                    spec=spec,
+                    context=context,
+                    output=output,
+                    usage=usage,
+                    cost_usd=cost_usd,
+                    trajectory=tuple(trajectory),
+                )
+
         if not set(spec.required_retrieval_tools).issubset(retrieved_tools):
             raise AgentRuntimeError(AgentFailureCode.REQUIRED_RETRIEVAL_MISSING)
         raise AgentRuntimeError(AgentFailureCode.TERMINAL_SUBMIT_MISSING)
+
+    async def _execute_read_calls(
+        self,
+        calls: tuple[tuple[int, ValidatedToolCall], ...],
+        *,
+        local_tool_call_ids: tuple[str, ...],
+        context: AgentRunContext,
+        spec: AgentSpec,
+        record: EventRecorder,
+    ) -> dict[int, ExecutedToolCall]:
+        tasks = {
+            index: asyncio.create_task(
+                self._execute_tool(
+                    validated,
+                    tool_call_id=local_tool_call_ids[index],
+                    context=context,
+                    spec=spec,
+                    record=record,
+                    include_observation=True,
+                )
+            )
+            for index, validated in calls
+        }
+        if not tasks:
+            return {}
+        results = await asyncio.gather(*tasks.values())
+        return dict(zip(tasks, results, strict=True))
+
+    async def _execute_tool(
+        self,
+        validated: ValidatedToolCall,
+        *,
+        tool_call_id: str,
+        context: AgentRunContext,
+        spec: AgentSpec,
+        record: EventRecorder,
+        include_observation: bool,
+    ) -> ExecutedToolCall:
+        await record(
+            LifecycleEventType.TOOL_STARTED,
+            payload={"tool_call_id": tool_call_id, "tool_name": validated.spec.name},
+            tool_call_id=tool_call_id,
+            tool_name=validated.spec.name,
+        )
+        try:
+            executed = await self._tool_registry.execute(
+                validated,
+                ToolExecutionContext(
+                    run_id=context.run_id,
+                    agent_id=spec.agent_id,
+                    deadline_at=context.deadline_at,
+                ),
+                timeout_seconds=min(validated.spec.timeout_seconds, self._require_remaining(context.deadline_at)),
+                max_observation_bytes=spec.budget.max_observation_bytes,
+                include_observation=include_observation,
+            )
+        except AgentRuntimeError:
+            await record(
+                LifecycleEventType.TOOL_FAILED,
+                payload={"tool_call_id": tool_call_id, "tool_name": validated.spec.name},
+                tool_call_id=tool_call_id,
+                tool_name=validated.spec.name,
+                status=ToolCallStatus.FAILED,
+            )
+            raise
+        payload: dict[str, str | int | float | bool | None] = {
+            "tool_call_id": tool_call_id,
+            "tool_name": validated.spec.name,
+        }
+        if executed.observation is not None:
+            payload["observation_hash"] = executed.observation.observation_hash
+            payload["observation_bytes"] = executed.observation.size_bytes
+        await record(
+            LifecycleEventType.TOOL_COMPLETED,
+            payload=payload,
+            tool_call_id=tool_call_id,
+            tool_name=validated.spec.name,
+            status=ToolCallStatus.COMPLETED,
+        )
+        return executed
 
     async def _complete_model(
         self,
@@ -407,6 +452,49 @@ class BoundedAgentRuntime:
         if remaining <= 0:
             raise AgentRuntimeError(AgentFailureCode.DEADLINE_EXCEEDED)
         return remaining
+
+
+def _tool_signature(name: str, arguments: BaseModel) -> str:
+    return name + "\n" + arguments.model_dump_json(by_alias=True, exclude_none=False)
+
+
+def _agent_result(
+    *,
+    spec: AgentSpec,
+    context: AgentRunContext,
+    output: BaseModel,
+    usage: ModelUsage,
+    cost_usd: Decimal,
+    trajectory: tuple[SanitizedTrajectoryRecord, ...],
+) -> AgentResult:
+    evidence = SanitizedAgentEvidence(
+        run_id=context.run_id,
+        run_version=context.run_version,
+        agent_id=spec.agent_id,
+        model_id=spec.model_id,
+        model_version=spec.model_version,
+        reasoning_effort=spec.reasoning_effort,
+        policy_version=spec.policy_version,
+        prompt=spec.prompt,
+        usage=usage,
+        cost_usd=cost_usd,
+        trajectory=trajectory,
+    )
+    return AgentResult(
+        run_id=context.run_id,
+        run_version=context.run_version,
+        agent_id=spec.agent_id,
+        model_id=spec.model_id,
+        model_version=spec.model_version,
+        reasoning_effort=spec.reasoning_effort,
+        policy_version=spec.policy_version,
+        prompt=spec.prompt,
+        output=output,
+        usage=usage,
+        cost_usd=cost_usd,
+        trajectory=trajectory,
+        evidence=evidence,
+    )
 
 
 def _cost(usage: ModelUsage, spec: AgentSpec) -> Decimal:

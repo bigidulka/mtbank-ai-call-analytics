@@ -301,7 +301,7 @@ class AgentRuntimeSettings(StrictFrozenModel):
     """Необязательный до wiring business agents runtime slice."""
 
     gateway: GatewaySettings
-    default_max_turns: PositiveInt = 3
+    default_max_turns: PositiveInt = 6
     default_max_input_tokens: PositiveInt = 8_000
     default_max_output_tokens: PositiveInt = 2_000
     default_max_cost_usd: NonNegativeDecimal = Decimal("1.00")
@@ -310,8 +310,8 @@ class AgentRuntimeSettings(StrictFrozenModel):
 
     @model_validator(mode="after")
     def validate_turn_bound(self) -> Self:
-        if self.default_max_turns > 3:
-            raise ValueError("default_max_turns bounded agent runtime не может превышать 3")
+        if self.default_max_turns > 8:
+            raise ValueError("default_max_turns bounded agent runtime не может превышать 8")
         if self.max_observation_bytes > 20_000:
             raise ValueError("max_observation_bytes не может превышать 20000")
         return self

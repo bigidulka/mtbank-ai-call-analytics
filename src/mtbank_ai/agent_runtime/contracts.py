@@ -49,6 +49,12 @@ class ToolCallStatus(StrEnum):
     FAILED = "failed"
 
 
+class ModelStreamEventType(StrEnum):
+    TEXT_DELTA = "text_delta"
+    TOOL_CALL_DELTA = "tool_call_delta"
+    COMPLETED = "completed"
+
+
 class AgentFailureCode(StrEnum):
     BUDGET_EXCEEDED = "budget_exceeded"
     DEADLINE_EXCEEDED = "deadline_exceeded"
@@ -61,6 +67,7 @@ class AgentFailureCode(StrEnum):
     TOOL_NOT_ALLOWED = "tool_not_allowed"
     TOOL_TIMEOUT = "tool_timeout"
     TOOL_EXECUTION_FAILED = "tool_execution_failed"
+    TOOL_LOOP_GUARD = "tool_loop_guard"
     OBSERVATION_TOO_LARGE = "observation_too_large"
     REQUIRED_RETRIEVAL_MISSING = "required_retrieval_missing"
     TERMINAL_SUBMIT_MISSING = "terminal_submit_missing"
@@ -157,6 +164,15 @@ class ModelUsage(StrictFrozenModel):
         return self
 
 
+class ModelToolCallDelta(StrictFrozenModel):
+    """One incomplete provider tool-call fragment; never execute it directly."""
+
+    index: NonNegativeInt
+    id: NonEmptyId | None = None
+    name: NonEmptyId | None = None
+    arguments_delta: Annotated[str, Field(max_length=65_536)] | None = None
+
+
 class ModelResponse(StrictFrozenModel):
     request_id: NonEmptyId | None
     model_id: NonEmptyId
@@ -174,6 +190,28 @@ class ModelResponse(StrictFrozenModel):
         return self
 
 
+class ModelStreamEvent(StrictFrozenModel):
+    """Typed internal provider stream event with exactly one completed response."""
+
+    sequence: PositiveInt
+    type: ModelStreamEventType
+    text_delta: Annotated[str, Field(min_length=1, max_length=20_000)] | None = None
+    tool_call_delta: ModelToolCallDelta | None = None
+    response: ModelResponse | None = None
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> Self:
+        if self.type is ModelStreamEventType.TEXT_DELTA:
+            if self.text_delta is None or self.tool_call_delta is not None or self.response is not None:
+                raise ValueError("text delta должен содержать только text_delta")
+        elif self.type is ModelStreamEventType.TOOL_CALL_DELTA:
+            if self.tool_call_delta is None or self.text_delta is not None or self.response is not None:
+                raise ValueError("tool delta должен содержать только tool_call_delta")
+        elif self.response is None or self.text_delta is not None or self.tool_call_delta is not None:
+            raise ValueError("completed stream event должен содержать response")
+        return self
+
+
 class PromptReference(StrictFrozenModel):
     prompt_id: NonEmptyId
     version: NonEmptyId
@@ -182,7 +220,9 @@ class PromptReference(StrictFrozenModel):
 
 
 class AgentBudget(StrictFrozenModel):
-    max_turns: PositiveInt = 3
+    max_turns: PositiveInt = 6
+    max_tool_calls: PositiveInt = 16
+    max_repeated_tool_calls: PositiveInt = 2
     max_input_tokens: PositiveInt
     max_output_tokens: PositiveInt
     max_cost_usd: NonNegativeDecimal
@@ -192,8 +232,12 @@ class AgentBudget(StrictFrozenModel):
 
     @model_validator(mode="after")
     def validate_turn_bound(self) -> Self:
-        if self.max_turns > 3:
-            raise ValueError("max_turns bounded agent runtime не может превышать 3")
+        if self.max_turns > 8:
+            raise ValueError("max_turns bounded agent runtime не может превышать 8")
+        if self.max_tool_calls > 24:
+            raise ValueError("max_tool_calls bounded agent runtime не может превышать 24")
+        if self.max_repeated_tool_calls > 4:
+            raise ValueError("max_repeated_tool_calls bounded agent runtime не может превышать 4")
         if self.max_observation_bytes > 20_000:
             raise ValueError("max_observation_bytes не может превышать 20000")
         return self

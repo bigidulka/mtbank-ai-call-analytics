@@ -5,14 +5,20 @@ from __future__ import annotations
 import asyncio
 import random as random_module
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Protocol
 
 from pydantic import model_validator
 
-from mtbank_ai.agent_runtime.contracts import AgentFailureCode, AgentRuntimeError, ModelRequest, ModelResponse
+from mtbank_ai.agent_runtime.contracts import (
+    AgentFailureCode,
+    AgentRuntimeError,
+    ModelRequest,
+    ModelResponse,
+    ModelStreamEvent,
+)
 from mtbank_ai.domain.base import PositiveFloat, PositiveInt, StrictFrozenModel
 from mtbank_ai.observability import Telemetry
 
@@ -45,6 +51,10 @@ class CircuitState(StrEnum):
 
 class ModelClient(Protocol):
     async def complete(self, request: ModelRequest, *, deadline_at: datetime) -> ModelResponse: ...
+
+
+class StreamingModelClient(ModelClient, Protocol):
+    def stream(self, request: ModelRequest, *, deadline_at: datetime) -> AsyncIterator[ModelStreamEvent]: ...
 
 
 class CircuitBreaker:
@@ -124,6 +134,38 @@ class ResilientModelClient:
     @property
     def circuit_breaker(self) -> CircuitBreaker:
         return self._circuit_breaker
+
+    def stream(self, request: ModelRequest, *, deadline_at: datetime) -> AsyncIterator[ModelStreamEvent]:
+        """Streaming is deliberately unretried after any emitted event."""
+        return self._stream(request, deadline_at=deadline_at)
+
+    async def _stream(self, request: ModelRequest, *, deadline_at: datetime) -> AsyncIterator[ModelStreamEvent]:
+        stream = getattr(self._client, "stream", None)
+        if not callable(stream):
+            raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE)
+        try:
+            await asyncio.wait_for(self._semaphore.acquire(), timeout=_remaining_seconds(deadline_at, self._now))
+        except TimeoutError:
+            raise AgentRuntimeError(AgentFailureCode.DEADLINE_EXCEEDED) from None
+        emitted = False
+        try:
+            self._circuit_breaker.before_call()
+            async for event in stream(request, deadline_at=deadline_at):  # type: ignore[reportGeneralTypeIssues]
+                emitted = True
+                yield event
+            self._circuit_breaker.record_success()
+        except asyncio.CancelledError:
+            raise
+        except AgentRuntimeError:
+            if not emitted:
+                self._circuit_breaker.record_failure()
+            raise
+        except Exception:
+            if not emitted:
+                self._circuit_breaker.record_failure()
+            raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE) from None
+        finally:
+            self._semaphore.release()
 
     async def complete(self, request: ModelRequest, *, deadline_at: datetime) -> ModelResponse:
         try:

@@ -13,7 +13,10 @@ from mtbank_ai.agent_runtime.contracts import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    ModelStreamEvent,
+    ModelStreamEventType,
     ModelToolCall,
+    ModelToolCallDelta,
     ModelUsage,
     PromptReference,
     SanitizedAgentEvidence,
@@ -23,7 +26,13 @@ from mtbank_ai.agent_runtime.contracts import (
 from mtbank_ai.agent_runtime.events import EventRedactionError, EventSink, InMemoryEventSink, LifecycleRecorder
 from mtbank_ai.agent_runtime.prompts import PromptBundle, PromptRegistry, PromptRegistryError
 from mtbank_ai.agent_runtime.provider import ConfiguredOpenAICompatibleGateway, OpenAICompatibleProvider, ProviderError
-from mtbank_ai.agent_runtime.retry import CircuitBreaker, CircuitBreakerPolicy, ResilientModelClient, RetryPolicy
+from mtbank_ai.agent_runtime.retry import (
+    CircuitBreaker,
+    CircuitBreakerPolicy,
+    ResilientModelClient,
+    RetryPolicy,
+    StreamingModelClient,
+)
 from mtbank_ai.agent_runtime.runtime import BoundedAgentRuntime
 from mtbank_ai.agent_runtime.tools import ToolRegistry, ToolSpec
 
@@ -47,7 +56,10 @@ __all__ = [
     "ModelMessage",
     "ModelRequest",
     "ModelResponse",
+    "ModelStreamEvent",
+    "ModelStreamEventType",
     "ModelToolCall",
+    "ModelToolCallDelta",
     "ModelUsage",
     "OpenAICompatibleProvider",
     "ProbeMode",
@@ -59,6 +71,7 @@ __all__ = [
     "ResilientModelClient",
     "RetryPolicy",
     "SanitizedAgentEvidence",
+    "StreamingModelClient",
     "ToolAuthorizer",
     "ToolChoice",
     "ToolRegistry",

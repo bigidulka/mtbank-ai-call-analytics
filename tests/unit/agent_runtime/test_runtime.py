@@ -208,8 +208,8 @@ def test_runtime_requires_retrieval_then_one_terminal_output_and_redacts_traject
     assert result.evidence.reasoning_effort == "high"
     assert result.usage == ModelUsage(input_tokens=2, output_tokens=2, total_tokens=4)
     assert tuple(request.model_id for request in client.requests) == ("configured-model", "configured-model")
-    assert {tool.name for tool in client.requests[0].tools} == {"retrieve"}
-    assert {tool.name for tool in client.requests[1].tools} == {"submit"}
+    assert {tool.name for tool in client.requests[0].tools} == {"retrieve", "submit"}
+    assert {tool.name for tool in client.requests[1].tools} == {"retrieve", "submit"}
     assert client.requests[1].messages[-1].role is MessageRole.TOOL
     assert client.requests[1].messages[-1].tool_call_id == remote_tool_ids[0]
     assert "untrusted_tool_result" in client.requests[1].messages[-1].content
@@ -365,7 +365,7 @@ def test_runtime_rejects_budget_deadline_and_missing_terminal() -> None:
     )
     with pytest.raises(AgentRuntimeError) as terminal_error:
         asyncio.run(_runtime(no_terminal, _registry()).run(_spec(), _context()))
-    assert terminal_error.value.code is AgentFailureCode.TERMINAL_SUBMIT_MISSING
+    assert terminal_error.value.code is AgentFailureCode.TOOL_LOOP_GUARD
 
     expired_context = AgentRunContext(
         run_id=RUN_ID,
@@ -393,11 +393,63 @@ def test_runtime_rejects_tool_timeout_and_model_fallback() -> None:
     assert model_error.value.code is AgentFailureCode.MODEL_MISMATCH
 
 
+def test_runtime_runs_multiple_allowed_reads_in_parallel_and_preserves_provider_order() -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def first(arguments: ToolInput, context: object) -> AgentOutput:
+        del arguments, context
+        started.set()
+        await release.wait()
+        return AgentOutput(value="first")
+
+    async def second(arguments: ToolInput, context: object) -> AgentOutput:
+        del arguments, context
+        await started.wait()
+        release.set()
+        return AgentOutput(value="second")
+
+    async def submit(arguments: ToolInput, context: object) -> AgentOutput:
+        del context
+        return AgentOutput(value=arguments.value)
+
+    registry = ToolRegistry(
+        (
+            ToolSpec("first", "First evidence.", ToolInput, AgentOutput, ToolSideEffect.READ_ONLY, 1, first),
+            ToolSpec("second", "Second evidence.", ToolInput, AgentOutput, ToolSideEffect.READ_ONLY, 1, second),
+            ToolSpec("submit", "Submit output.", ToolInput, AgentOutput, ToolSideEffect.TERMINAL_SUBMIT, 1, submit),
+        )
+    )
+    spec = _spec(allowed_read_tools=("first", "second"), required_retrieval_tools=("first", "second"))
+    client = ScriptedClient(
+        (
+            _response(_call("first", call_id="first-call"), _call("second", call_id="second-call")),
+            _response(_call("submit", call_id="submit-call")),
+        )
+    )
+
+    result = asyncio.run(_runtime(client, registry).run(spec, _context()))
+
+    assert result.output == AgentOutput(value="safe")
+    assert all(request.tool_choice.value == "auto" for request in client.requests)
+    tool_messages = [message for message in client.requests[1].messages if message.role is MessageRole.TOOL]
+    assert [message.tool_call_id for message in tool_messages] == ["first-call", "second-call"]
+
+
+def test_runtime_rejects_repeated_tool_cycle_before_handler() -> None:
+    client = ScriptedClient(tuple(_response(_call("retrieve", call_id=call_id)) for call_id in ("one", "two", "three")))
+
+    with pytest.raises(AgentRuntimeError) as error:
+        asyncio.run(_runtime(client, _registry()).run(_spec(), _context()))
+
+    assert error.value.code is AgentFailureCode.TOOL_LOOP_GUARD
+
+
 def test_agent_contracts_are_strict_and_limit_turns() -> None:
     with pytest.raises(ValidationError, match="max_turns"):
         _spec(
             budget=AgentBudget(
-                max_turns=4,
+                max_turns=9,
                 max_input_tokens=1,
                 max_output_tokens=1,
                 max_cost_usd=Decimal("0"),

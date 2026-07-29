@@ -221,8 +221,13 @@ def test_trends_agent_requires_both_aggregate_tools_and_preserves_model_provenan
         assert tuple(tool.name for tool in client.requests[0].tools) == (
             "trend_aggregate_query",
             "trend_evidence_retrieve",
+            "submit_trend",
         )
-        assert tuple(tool.name for tool in client.requests[1].tools) == ("submit_trend",)
+        assert tuple(tool.name for tool in client.requests[1].tools) == (
+            "trend_aggregate_query",
+            "trend_evidence_retrieve",
+            "submit_trend",
+        )
         assert {request.model_id for request in client.requests} == {"trends-model"}
         assert {request.reasoning_effort for request in client.requests} == {"high"}
         assert client.requests[1].messages[-1].role.value == "tool"
