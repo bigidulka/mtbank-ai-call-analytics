@@ -111,6 +111,7 @@ def test_role_agent_uses_one_required_terminal_tool_and_returns_grounded_roles()
     assert request.tools[0].name == "submit_role_resolution"
     assert request.temperature == 0.0
     assert "`evidence` должен быть непустой краткой причиной" in request.messages[0].content
+    assert "ровно один самый сильный точный segment ID" in request.messages[0].content
 
 
 @pytest.mark.parametrize(
