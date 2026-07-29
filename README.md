@@ -65,23 +65,23 @@ OpenWebUI Pipeline ─┬─ POST /analyze
 
 | Файл | Формат | Hz | Длительность | WER | DER | Role accuracy | GPU latency |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `synthetic-credit-consultation` | WAV | 16000 | 239.546 с | 8.89% | 19.11% | 84.20% | 9.797 с |
-| `synthetic-card-complaint-telephone` | WAV | 8000 | 119.434 с | 5.26% | 19.95% | 84.94% | 4.361 с |
-| `synthetic-transfer-question` | MP3 | 16000 | 114.850 с | 6.10% | 20.97% | 84.27% | 3.893 с |
-| `synthetic-mobile-app-security` | OGG | 16000 | 113.194 с | 4.82% | 21.29% | 83.70% | 4.097 с |
-| `synthetic-deposit-consultation` | WAV | 16000 | 127.778 с | 6.29% | 21.67% | 82.69% | 4.943 с |
-| **Micro aggregate** | — | — | **714.802 с** | **6.76%** | **20.34%** | **83.99%** | **27.091 с** |
+| `synthetic-credit-consultation` | WAV | 16000 | 239.546 с | 10.56% | 19.03% | 84.15% | 35.867 с |
+| `synthetic-card-complaint-telephone` | WAV | 8000 | 119.434 с | 5.26% | 19.95% | 84.94% | 3.883 с |
+| `synthetic-transfer-question` | MP3 | 16000 | 114.850 с | 6.10% | 20.97% | 84.27% | 3.692 с |
+| `synthetic-mobile-app-security` | OGG | 16000 | 113.194 с | 4.82% | 21.29% | 83.70% | 3.656 с |
+| `synthetic-deposit-consultation` | WAV | 16000 | 127.778 с | 6.29% | 21.60% | 82.69% | 11.594 с |
+| **Micro aggregate** | — | — | **714.802 с** | **7.34%** | **20.30%** | **83.97%** | **58.692 с** |
 
-Evaluator сохраняет audio/reference/hypothesis hashes, model revisions и component artifact hashes. Transient retry разрешён только для `429/500/503/504`; schema и role-resolution failures остаются fail-closed.
+Evaluator сохраняет audio/reference/hypothesis hashes, model revisions и component artifact hashes. Transient retry разрешён только для `429/500/502/503/504`; schema и role-resolution failures остаются fail-closed.
 
 ## Производительность и бонусы
 
 | Проверка | Результат | Evidence |
 |---|---:|---|
-| Публичный end-to-end анализ файла **300.0 с** | **35.979 с**, HTTP 200 | [`public-five-minute-sla.json`](release-evidence/final-115/public-five-minute-sla.json) |
-| Первый WebSocket provisional transcript, live diagnostic | **1428.098 мс** | [`websocket-p95.json`](release-evidence/final-115/websocket-p95.json) |
-| Canonical reconciliation после streaming | **18.416 с** | [`websocket-p95.json`](release-evidence/final-115/websocket-p95.json) |
-| Trends | 11 calls, 3 supporting calls, confidence 0.9 | [`trends-response.json`](release-evidence/final-115/trends-response.json) |
+| Публичный end-to-end анализ файла **300.0 с** | **27.880 с**, HTTP 200 | [`public-five-minute-sla.json`](release-evidence/final-115/public-five-minute-sla.json) |
+| WebSocket provisional transcript p95, live diagnostic | **624.099 мс** | [`websocket-p95.json`](release-evidence/final-115/websocket-p95.json) |
+| Canonical reconciliation после streaming | **26.930 с** | [`websocket-p95.json`](release-evidence/final-115/websocket-p95.json) |
+| Trends | 21 calls, 6 supporting calls, confidence 0.86 | [`trends-response.json`](release-evidence/final-115/trends-response.json) |
 
 WebSocket partials создаются bounded rolling GPU windows; финальный ответ всегда повторно проходит canonical full-batch speech и четыре аналитических агента.
 
