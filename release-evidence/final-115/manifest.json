@@ -1,6 +1,5 @@
 {
   "schema_version": 1,
-  "commit_sha": "f3903c3e1292bcc2b0f634a43f659af45db48da9",
   "speech_image_digest": "sha256:9fbfa02a6ba975d705a98bcf5651ac4ae9d86d8523846f9bce68bed552cc0a81",
   "files": [
     {
@@ -33,5 +32,7 @@
       "sha256": "5be612a9b79d31a80d4d385f7c6a6e932513b4c04920937d9c43232bc151a6ba",
       "bytes": 688
     }
-  ]
+  ],
+  "evidence_commit_sha": "f3903c3e1292bcc2b0f634a43f659af45db48da9",
+  "release_manifest_commit_note": "Manifest and evidence files committed together after runtime validation."
 }
