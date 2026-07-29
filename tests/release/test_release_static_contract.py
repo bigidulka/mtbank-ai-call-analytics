@@ -56,8 +56,10 @@ def test_readme_discloses_local_asr_and_collected_runtime_evidence() -> None:
         "local `faster-whisper` `large-v3-turbo`",
         "local pyannote Community-1",
         "Micro aggregate",
-        "35.979 с",
-        "1428.098 мс",
+        "7.34%",
+        "27.880 с",
+        "624.099 мс",
+        "26.930 с",
         "release-evidence/final-115",
     ):
         assert value in readme

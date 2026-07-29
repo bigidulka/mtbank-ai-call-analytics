@@ -1,49 +1,27 @@
 # Release checklist
 
-Run `uv run python scripts/check_release_gate.py`. A result of `blocked` is not a
-passing release result, even when unit tests pass. `--allow-blocked` only returns zero
-so CI or an operator can save a diagnostic blocked-gate report; it never approves a
-release and does not turn absent evidence into evidence. Store that report as an
-external CI/runtime artifact, not in `release-evidence/` or the repository.
+Этот checklist разделяет обязательный assignment handoff и дополнительные production/organizational gates. Отсутствие внешней registry attestation или разрешения на реальные клиентские данные не блокирует synthetic/no-PII demo, но блокирует любые production claims.
 
-`declared_image_digest` и `reviewer_reference_sha256` — только локальные correlation fields. Echo
-`/v1/runtime` и hash идентификатора reviewer не доказывают registry provenance или независимую
-external проверку. Поэтому `independent_external_attestation` остаётся hard-blocked: approval
-выполняется и фиксируется независимой внешней процедурой, а не self-reported evidence в checkout.
+## Assignment handoff — verified
 
-## Required immutable evidence
+- [x] Пять authored synthetic звонков: 714.802 секунды, WAV/MP3/OGG, 8/16 kHz, reference text/timestamps/roles и SHA-256 provenance.
+- [x] Canonical CUDA `float16` runtime: local `faster-whisper` large-v3-turbo + local pyannote Community-1, без ASR fallback.
+- [x] Five-file WER/DER/role evaluation: [`../release-evidence/final-115/canonical-speech-evaluation.json`](../release-evidence/final-115/canonical-speech-evaluation.json).
+- [x] Public 300-second HTTPS analysis under 60 seconds: [`../release-evidence/final-115/public-five-minute-sla.json`](../release-evidence/final-115/public-five-minute-sla.json).
+- [x] App-plane runtime binding to immutable GPU digest: [`../release-evidence/final-115/runtime-binding.json`](../release-evidence/final-115/runtime-binding.json).
+- [x] OpenWebUI attachment production flow plus boundary checks: [`../release-evidence/final-115/openwebui-attachment-e2e.json`](../release-evidence/final-115/openwebui-attachment-e2e.json).
+- [x] Trends over persisted sanitized calls: [`../release-evidence/final-115/trends-response.json`](../release-evidence/final-115/trends-response.json).
+- [x] WebSocket live diagnostic p95 below 3 seconds with canonical reconciliation: [`../release-evidence/final-115/websocket-p95.json`](../release-evidence/final-115/websocket-p95.json).
+- [x] Prometheus and provisioned Grafana dashboard for calls, quality, topics, latency, failures and agent tokens.
+- [x] Final evidence files linked by SHA-256 and byte count: [`../release-evidence/final-115/manifest.json`](../release-evidence/final-115/manifest.json).
+- [x] Offline tests, Ruff, formatting and Pyright green on submission branch.
 
-- [ ] Licensed corpus approval for the authored synthetic corpus: 5 calls, 714.802
-  seconds, reference text/roles, 8 kHz and WAV/MP3/OGG.
-- [ ] Complete local `faster-whisper` + Community-1 WER/DER/role report for all five files, produced by `evaluate_canonical_speech.py`.
-- [ ] External independent approval for `models/manifest.json` schema v3, verified ASR/Community-1 artifact tree hashes, file counts, and revisions. `reviewer_reference_sha256` may correlate the external record but cannot attest it.
-- [ ] Groq credentials and approved remote raw-audio disclosure only for opt-in WebSocket provisional mode.
-- [x] Canonical batch ASR uses local `faster-whisper` medium+ equivalent (`large-v3-turbo`); ASR fallback is absent.
-- [x] Development OpenAI-compatible CLIProxyAPI model identity and local four-agent
-  live smoke with retrieval and terminal submissions.
-- [ ] Final gateway HTTPS nonce-bound release attestation and canonical trace artifact
-  with sanitized provider request ID hashes.
-- [ ] GPU benchmark from a self-hosted GPU runner, including workload revision, measured limits, and a bearer-fetched app-plane `/v1/benchmark-runtime-binding` response on the same authority as `/ws/transcribe`. It reports the configured remote CUDA `float16` runtime and schema-v3 component revisions without exposing the RunPod bearer. Its `declared_image_digest` echo is not external registry attestation; no local Docker image ID or CPU-derived GPU SLA claim.
-- [ ] Live Grafana browser proof, cleaned of PII.
-- [ ] WebSocket GPU p95 proof for the approved workload.
-- [ ] Canonical Docker application image built from frozen dependencies and its final
-  canonical image digest. If PyPI is unavailable, use only the documented trusted wheelhouse path; do
-  not remove hashes.
-- [ ] Final competitor score on the immutable release SHA.
+## External/production gates — intentionally not claimed
 
-## Current status
+- [ ] Independent external registry/model-artifact attestation.
+- [ ] Organizational approval for real customer audio, banking secrecy and PII processing.
+- [ ] Repeated load/stability study on noisy production calls.
+- [ ] Signed production image/SBOM and independent competitor score.
+- [ ] Production SLO, incident response and long-lived credential-rotation approval.
 
-Для project-generated synthetic corpus scope-limited remote-audio разрешение должно
-быть проверено отдельно; organizational approval для реальных клиентских/production данных
-не предоставлено. Текущий checkout не содержит доказательства controlled canonical speech
-run, Community-1 artifact review, real four-agent E2E, Grafana browser proof или GPU run.
-CPU WebSocket diagnostic не является GPU evidence. Frozen static competitor benchmark не
-заменяет runtime proof, а все comparative scores остаются `unknown`. Final gateway nonce
-attestation, canonical metrics, GPU benchmark, GPU WS p95, Grafana artifact, canonical image
-digest, signed image bundle и verified competitor score заблокированы до соответствующей
-external attestation.
-
-Before an approval, verify source/lock hashes, policy/prompt/dataset/model revisions,
-unit/contract and disposable migration results, and the generated release-gate manifest.
-SBOM is attached only when the real `syft` tool is available; no synthetic SBOM
-placeholder is emitted.
+`uv run python scripts/check_release_gate.py` remains a conservative production-readiness diagnostic. `blocked` means production/external attestation is incomplete; it does not invalidate assignment-scoped synthetic demo evidence above. `--allow-blocked` never converts missing evidence into evidence.

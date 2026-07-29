@@ -18,7 +18,7 @@ uv run python scripts/evaluate_canonical_speech.py \
   --output release-evidence/canonical-speech-evaluation.json
 ```
 
-Runner последовательно отправляет все пять files в canonical `/v1/transcribe`, затем считает micro WER, DER, time-weighted role accuracy и speaker-attributed WER. Output содержит только hashes, component revisions, latency и metric counts — без audio, transcript, provider body, request ID или credentials. Любой `409`, `5xx` или invalid response останавливает run fail-closed; partial result не является corpus-wide metric claim.
+Runner последовательно отправляет все пять files в canonical `/v1/transcribe`, затем считает micro WER, DER, time-weighted role accuracy и speaker-attributed WER. Output содержит только hashes, component revisions, latency и metric counts — без audio, transcript, provider body, request ID или credentials. `409` и invalid response останавливают run fail-closed. Ограниченный retry применяется только к transient `429/500/502/503/504`; исчерпание retry останавливает run, а partial result не является corpus-wide metric claim. Актуальный controlled GPU-отчёт: [`../release-evidence/final-115/canonical-speech-evaluation.json`](../release-evidence/final-115/canonical-speech-evaluation.json).
 
 ## Five-minute SLA
 
@@ -37,4 +37,4 @@ Groq используется только в opt-in WebSocket provisional mode.
 
 ## Artifact policy
 
-`models/manifest.json` и `models/.gitkeep` версионируются; weights в `models/artifacts/`, временные benchmark files и `release-evidence/` игнорируются. Privacy-safe external evidence публикуется только после полного controlled run.
+`models/manifest.json` и `models/.gitkeep` версионируются; weights в `models/artifacts/` и временные benchmark files игнорируются. Privacy-safe финальный evidence после полного controlled run версионируется в [`../release-evidence/final-115/`](../release-evidence/final-115/) и связан SHA-256 manifest. Audio, transcript, credentials и raw provider bodies туда не входят.

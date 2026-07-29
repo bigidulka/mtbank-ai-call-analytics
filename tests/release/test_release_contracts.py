@@ -362,4 +362,6 @@ def test_versioned_gate_ids_include_external_hard_block_without_false_evidence()
         "public-five-minute-sla.json",
         "trends-response.json",
         "websocket-p95.json",
+        "runtime-binding.json",
+        "openwebui-attachment-e2e.json",
     }

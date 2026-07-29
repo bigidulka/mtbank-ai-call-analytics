@@ -9,8 +9,11 @@ AI-система для транскрибации и многоагентно�
 - **Исходное ТЗ:** [`docs/assignment.md`](docs/assignment.md)
 - **Машинно-читаемые результаты:** [`release-evidence/final-115/`](release-evidence/final-115/)
 
+Демо защищено от свободной регистрации. Рекрутеру передаются отдельные временные OpenWebUI и read-only Grafana credentials вместе со ссылками; secrets не публикуются в Git.
+
 ## Быстрая проверка
 
+0. Войти временными evaluator credentials из сообщения со ссылкой.
 1. Открыть [публичный OpenWebUI](https://mtbank.arbitron.dev).
 2. Выбрать модель **MTBank Attachment Probe**.
 3. Написать текстовый вопрос — отдельный bounded LLM-agent объяснит форматы, API, streaming, Grafana и сценарий проверки с учётом истории диалога.
@@ -43,7 +46,7 @@ OpenWebUI Pipeline ─┬─ POST /analyze
 
 Один canonical workflow обслуживает OpenWebUI и REST API. Четыре агента запускаются параллельно через bounded Supervisor, используют retrieval-first Tools/Actions и завершаются typed terminal output. Итоговый score и compliance агрегируются детерминированно, а evidence привязывается к segment IDs.
 
-Собственный Supervisor выбран вместо LangGraph: граф фиксирован как `speech → 4 parallel agents → aggregation`, поэтому отдельный checkpoint/state-machine слой не нужен.
+Собственный Supervisor выбран вместо LangGraph: граф фиксирован как `speech → 4 parallel agents → aggregation`, поэтому отдельный checkpoint/state-machine слой не нужен. Аналитические агенты используют `gpt-5.6-sol` через bounded OpenAI-compatible gateway: typed terminal tools, deadline/token limits, retry/circuit breaker и model-drift validation важнее vendor-specific orchestration.
 
 ## Покрытие ТЗ
 
