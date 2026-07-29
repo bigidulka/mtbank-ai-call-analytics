@@ -58,8 +58,8 @@ def test_readme_discloses_local_asr_and_collected_runtime_evidence() -> None:
         "Micro aggregate",
         "7.34%",
         "27.880 с",
-        "624.099 мс",
-        "26.930 с",
+        "632.830 мс",
+        "21.050 с",
         "release-evidence/final-115",
     ):
         assert value in readme

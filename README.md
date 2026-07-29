@@ -82,8 +82,8 @@ Evaluator сохраняет audio/reference/hypothesis hashes, model revisions 
 | Проверка | Результат | Evidence |
 |---|---:|---|
 | Публичный end-to-end анализ файла **300.0 с** | **27.880 с**, HTTP 200 | [`public-five-minute-sla.json`](release-evidence/final-115/public-five-minute-sla.json) |
-| WebSocket provisional transcript p95, live diagnostic | **624.099 мс** | [`websocket-p95.json`](release-evidence/final-115/websocket-p95.json) |
-| Canonical reconciliation после streaming | **26.930 с** | [`websocket-p95.json`](release-evidence/final-115/websocket-p95.json) |
+| WebSocket provisional transcript p95, live diagnostic | **632.830 мс** | [`websocket-p95.json`](release-evidence/final-115/websocket-p95.json) |
+| Canonical reconciliation после streaming | **21.050 с** | [`websocket-p95.json`](release-evidence/final-115/websocket-p95.json) |
 | Trends | 21 calls, 6 supporting calls, confidence 0.86 | [`trends-response.json`](release-evidence/final-115/trends-response.json) |
 
 WebSocket partials создаются bounded rolling GPU windows; финальный ответ всегда повторно проходит canonical full-batch speech и четыре аналитических агента.

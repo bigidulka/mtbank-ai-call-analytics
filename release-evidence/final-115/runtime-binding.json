@@ -1,7 +1,7 @@
 {
     "schema_version": "1",
     "kind": "configured-remote-speech-runtime",
-    "speech_backend_url_sha256": "4faae2cc94dd5252e3a43ba27fd91ce58c7bcf47581ebb60edd28e0e59c32665",
+    "speech_backend_url_sha256": "b5b1d3dc4531e755bfefe9b491bda87dc8f988ff1ff22a8b045d28692413f395",
     "runtime": {
         "device": "cuda",
         "compute_type": "float16",

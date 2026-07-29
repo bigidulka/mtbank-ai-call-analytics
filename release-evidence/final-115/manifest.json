@@ -19,12 +19,12 @@
     },
     {
       "path": "websocket-p95.json",
-      "sha256": "075d255f55c58addaf019a7346b3dd17acc533ae58967f29370ea9488ae89f3f",
-      "bytes": 1570
+      "sha256": "79c70f1d9e9f3713ed45b085893f2c5852ddc352bc6296ff0de2dbde37ca0bf1",
+      "bytes": 1962
     },
     {
       "path": "runtime-binding.json",
-      "sha256": "b9fdb949236116bc7756a97c6aaa341f09855ea3549a570d07390f58c04c9d97",
+      "sha256": "19c86e656243a542e46de9887b1ac64ba7676d4a11e1f5326840b3db1ce2f8bb",
       "bytes": 872
     },
     {
@@ -34,5 +34,5 @@
     }
   ],
   "evidence_commit_sha": "f3903c3e1292bcc2b0f634a43f659af45db48da9",
-  "release_manifest_commit_note": "Manifest and evidence files committed together after runtime validation."
+  "release_manifest_commit_note": "Manifest and evidence files committed together after final credential rotation and runtime validation."
 }
