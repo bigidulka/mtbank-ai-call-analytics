@@ -455,7 +455,11 @@ def test_gateway_config_limits_body_and_keeps_streaming_proxy_settings() -> None
     assert "~*^https$" not in config
     assert config.count("$http_x_forwarded_proto") == 1
     assert "X-Forwarded-Proto $scheme;" not in config
-    assert config.count("X-Forwarded-Proto $forwarded_proto;") == 7
+    assert config.count("X-Forwarded-Proto $forwarded_proto;") == 9
+    assert "location = /health/live {" in config
+    assert "proxy_pass http://api:8000/health/live;" in config
+    assert "location = /health/ready {" in config
+    assert "proxy_pass http://api:8000/health/ready;" in config
     assert "location = /analyze {" in config
     assert "proxy_pass http://api:8000/analyze;" in config
     assert "location = /v1/benchmark-runtime-binding {" in config
