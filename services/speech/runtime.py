@@ -17,7 +17,6 @@ from services.speech.errors import (
     SpeechConfigurationError,
     SpeechDeadlineExceededError,
     SpeechOverloadedError,
-    SpeechProviderError,
 )
 from services.speech.manifest import ModelRegistry
 from services.speech.media import MediaLimits, MediaNormalizer
@@ -156,11 +155,7 @@ class LazySpeechRuntime:
     async def _execute(self, source: SpeechFile) -> SpeechTranscriptionResponse:
         async with self._model_slot:
             engine = await self._get_engine()
-            try:
-                return await asyncio.to_thread(engine.transcribe, source)
-            except SpeechProviderError:
-                self._fatal_provider_failure = True
-                raise
+            return await asyncio.to_thread(engine.transcribe, source)
 
     async def _get_engine(self) -> CanonicalBatchEngine:
         async with self._engine_lock:

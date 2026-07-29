@@ -9,7 +9,7 @@ import pytest
 from mtbank_ai.speech.contracts import SpeechFile, SpeechTranscriptionResponse
 from mtbank_ai.speech.streaming import StreamingStart, StreamingUpdate
 from services.speech import runtime as speech_runtime
-from services.speech.errors import SpeechConfigurationError, SpeechOverloadedError
+from services.speech.errors import SpeechConfigurationError, SpeechOverloadedError, SpeechProviderError
 from services.speech.runtime import LazySpeechRuntime
 from services.speech.settings import SpeechRuntimeSettings, SpeechStreamingSettings
 from tests.unit.speech._helpers import make_registry
@@ -27,6 +27,12 @@ class BlockingEngine:
         self.started.set()
         assert self.release.wait(timeout=3.0)
         return cast(SpeechTranscriptionResponse, object())
+
+
+class ProviderFailureEngine:
+    def transcribe(self, source: SpeechFile) -> SpeechTranscriptionResponse:
+        del source
+        raise SpeechProviderError("transient role provider failure")
 
 
 class SuccessfulEngine:
@@ -89,6 +95,24 @@ def test_runtime_releases_slot_after_each_successful_request(tmp_path) -> None:
         for index in range(3):
             await runtime.transcribe(SpeechFile(f"call-{index}.wav", "audio/wav", b"RIFF"))
         assert engine.calls == 3
+
+    asyncio.run(scenario())
+
+
+def test_transient_provider_failure_does_not_poison_runtime_readiness(tmp_path) -> None:
+    runtime_settings = SpeechRuntimeSettings(temp_root=str(tmp_path / "work"))
+    _, settings = make_registry(tmp_path, runtime=runtime_settings)
+    engine = ProviderFailureEngine()
+
+    def factory(registry, runtime, groq, resolver):
+        del registry, runtime, groq, resolver
+        return cast(object, engine)
+
+    async def scenario() -> None:
+        runtime = LazySpeechRuntime(settings, engine_factory=factory)  # type: ignore[arg-type]
+        with pytest.raises(SpeechProviderError):
+            await runtime.transcribe(SpeechFile("call.wav", "audio/wav", b"RIFF"))
+        assert await runtime.ready()
 
     asyncio.run(scenario())
 
