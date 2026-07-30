@@ -163,22 +163,25 @@ class FakeSpeechClient:
 
 
 class FakeRunner:
-    def __init__(self, output: object) -> None:
+    def __init__(self, output: object, *, delay_seconds: float = 0.0) -> None:
         self._output = output
+        self._delay_seconds = delay_seconds
 
     async def run(self, transcript: TranscriptSnapshot, **kwargs: object) -> SimpleNamespace:
         del transcript, kwargs
         if isinstance(self._output, BaseException):
             raise self._output
-        await asyncio.sleep(0)
+        await asyncio.sleep(self._delay_seconds)
         return SimpleNamespace(output=self._output)
 
 
 class FakeAgents:
     agent_ids = ("classifier", "quality", "compliance", "summarizer")
 
-    def __init__(self, outputs: Mapping[str, object]) -> None:
-        self._runners = {agent_id: FakeRunner(outputs[agent_id]) for agent_id in self.agent_ids}
+    def __init__(self, outputs: Mapping[str, object], *, delay_seconds: float = 0.0) -> None:
+        self._runners = {
+            agent_id: FakeRunner(outputs[agent_id], delay_seconds=delay_seconds) for agent_id in self.agent_ids
+        }
 
     def runner(self, agent_id: str) -> FakeRunner:
         return self._runners[agent_id]
@@ -280,10 +283,11 @@ def _workflow(
     *,
     speech_client: FakeSpeechClient | None = None,
     workflow_settings: WorkflowSettings | None = None,
+    agent_delay_seconds: float = 0.0,
 ) -> AnalysisWorkflow:
     return AnalysisWorkflow(
         speech_client=speech_client or FakeSpeechClient(),  # type: ignore[arg-type]
-        agents=FakeAgents(outputs),  # type: ignore[arg-type]
+        agents=FakeAgents(outputs, delay_seconds=agent_delay_seconds),  # type: ignore[arg-type]
         policies=PolicyRegistry(),
         runtime_settings=_runtime_settings(),
         workflow_settings=workflow_settings or WorkflowSettings(code_sha="abcdef0"),
@@ -324,6 +328,26 @@ def test_workflow_aggregates_only_deterministic_score_and_compliance_and_persist
             current.previous_hash == previous.current_hash
             for previous, current in zip(persisted.events.events, persisted.events.events[1:])
         )
+
+    asyncio.run(scenario())
+
+
+def test_workflow_allows_parallel_agents_to_finish_within_extended_deadline() -> None:
+    async def scenario() -> None:
+        factory = MemoryUnitOfWorkFactory()
+        started = asyncio.get_running_loop().time()
+        response = await _workflow(
+            _outputs(),
+            factory,
+            workflow_settings=WorkflowSettings(code_sha="abcdef0", deadline_seconds=0.2),
+            agent_delay_seconds=0.05,
+        ).analyze(
+            FileAnalyzeInput(filename="call.wav", content_type="audio/wav", content=b"RIFF"),
+            request_id=RUN_ID,
+        )
+
+        assert response.classification.topic == "кредиты"
+        assert asyncio.get_running_loop().time() - started < 0.15
 
     asyncio.run(scenario())
 

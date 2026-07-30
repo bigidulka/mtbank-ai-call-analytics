@@ -520,7 +520,7 @@ class Pipeline:
     class Valves(BaseModel):
         ATTACHMENT_REF_TTL_SECONDS: int = Field(default=300, ge=1, le=3600)
         MAX_ATTACHMENT_BYTES: int = Field(default=_HARD_MAX_ATTACHMENT_BYTES, ge=1, le=_HARD_MAX_ATTACHMENT_BYTES)
-        HTTP_TIMEOUT_SECONDS: int = Field(default=60, ge=1, le=60)
+        HTTP_TIMEOUT_SECONDS: int = Field(default=240, ge=1, le=240)
         DISPLAY_NAME: str = Field(default="MTBank Attachment Probe", min_length=1, max_length=80)
 
     def __init__(

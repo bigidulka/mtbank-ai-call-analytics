@@ -305,7 +305,7 @@ def test_api_projects_complete_fail_closed_analysis_runtime_configuration() -> N
         "MTBANK_SPEECH__TRANSCRIPTION_PATH: /v1/transcribe",
         'MTBANK_SPEECH__TIMEOUT_SECONDS: "180"',
         required_environment("MTBANK_WORKFLOW__CODE_SHA"),
-        'MTBANK_WORKFLOW__DEADLINE_SECONDS: "60"',
+        'MTBANK_WORKFLOW__DEADLINE_SECONDS: "180"',
         'MTBANK_WORKFLOW__URL_TIMEOUT_SECONDS: "15"',
         'MTBANK_WORKFLOW__URL_MAX_REDIRECTS: "3"',
         "MTBANK_WORKFLOW__PRIVACY_MODE: redacted-cloud",
