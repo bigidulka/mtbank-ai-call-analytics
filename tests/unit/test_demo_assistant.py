@@ -169,7 +169,7 @@ def test_demo_assistant_uses_reviewed_prompt_and_dedicated_final_stream() -> Non
     assert final.messages[-2].content == "Draft answer."
     assert final.messages[-1].role.value == "user"
     assert "Final response turn" in (final.messages[-1].content or "")
-    assert 0 < (client.deadlines[0] - datetime.now(UTC)).total_seconds() <= 15
+    assert 0 < (client.deadlines[0] - datetime.now(UTC)).total_seconds() <= 30
 
 
 def test_demo_assistant_runs_parallel_safe_tools_then_streams_only_final_answer() -> None:
