@@ -90,6 +90,8 @@ def request_json(
             data = response.read(MAX_RESPONSE_BYTES + 1)
     except HTTPError as error:
         detail = error.read(500).decode(errors="replace")
+        if path == "/health/ready" and error.code == 503:
+            raise RuntimeError("production readiness is not green") from error
         raise RuntimeError(f"{method} {path}: HTTP {error.code}: {detail}") from error
     if len(data) > MAX_RESPONSE_BYTES:
         raise RuntimeError(f"{method} {path}: response too large")
