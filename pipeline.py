@@ -371,7 +371,6 @@ class ApiAssistantClient:
         total_bytes = 0
         event_count = 0
         answer_chars = 0
-        answer_parts: list[str] = []
         saw_start = False
         saw_done = False
 
@@ -421,7 +420,7 @@ class ApiAssistantClient:
                     answer_chars += len(text)
                     if answer_chars > 8_000:
                         raise ValueError("assistant SSE answer exceeded bound")
-                    answer_parts.append(text)
+                    yield text
                 elif event_name == "done":
                     if not saw_start or saw_done or set(parsed) != {"v", "sequence"}:
                         raise ValueError("assistant SSE done is invalid")
@@ -435,9 +434,8 @@ class ApiAssistantClient:
                 data_line = None
             elif not line.startswith(":"):
                 raise ValueError("assistant SSE field is invalid")
-        if event_name is not None or data_line is not None or not saw_start or not saw_done or not answer_parts:
+        if event_name is not None or data_line is not None or not saw_start or not saw_done or answer_chars <= 0:
             raise ValueError("assistant SSE stream ended before done")
-        yield from answer_parts
 
     def answer(self, message: str, history: list[dict[str, str]]) -> str:
         payload = json.dumps(

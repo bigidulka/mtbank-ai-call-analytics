@@ -23,7 +23,8 @@ prompt, model and code revisions is required for reproducibility.
   deltas. Tool arguments/results, provider IDs/model metadata, prompts and hidden reasoning
   stay inside runtime. Tool-selection turns remain private; only a dedicated no-tools final
   turn can emit text. A bounded safety holdback, terminal `stop`, exact final text and
-  protocol-marker checks gate `done`. Disconnect cancels active provider/tool work; malformed,
+  protocol-marker checks gate `done`; deltas flow immediately after bounded holdback.
+  Disconnect cancels active provider/tool work; malformed,
   oversized or partial SSE fails closed without a synthetic business answer. Assistant
   Trends allows one reviewed-topic query and suppresses cohorts below privacy threshold.
 - PostgreSQL persistence and release evidence exclude raw content. Evidence hashes

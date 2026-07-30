@@ -51,8 +51,8 @@ Text assistant использует отдельный bounded multi-turn loop �
 streaming final-answer deltas, authenticated SSE и synchronous OpenWebUI generator.
 Промежуточный provider text tool-turns, arguments, observations и chain-of-thought не
 публикуются. После tool selection запускается отдельный no-tools final turn; его deltas
-идут с bounded safety holdback, а terminal `stop`, exact text и общий лимит проверяются до
-`done`. Expensive nested Trends допускается один раз, restricted reviewed taxonomy, small cohorts suppressed,
+идут сразу после bounded safety holdback, а terminal `stop`, exact text и общий лимит
+проверяются до `done`. Expensive nested Trends допускается один раз, restricted reviewed taxonomy, small cohorts suppressed,
 его usage/cost включаются в parent budget. Buffered `POST /assistant` сохранён как
 compatibility adapter поверх stream.
 

@@ -705,7 +705,7 @@ def test_api_assistant_client_fails_closed_on_invalid_or_partial_sse() -> None:
     assert invalid.closed is True
 
 
-def test_api_assistant_client_discards_partial_delta_without_done() -> None:
+def test_api_assistant_client_surfaces_partial_delta_then_fails_without_done() -> None:
     partial = _SseResponse(
         (
             *_sse("start", 1, '{"v":1,"sequence":1}'),
@@ -719,11 +719,14 @@ def test_api_assistant_client_discards_partial_delta_without_done() -> None:
         opener=lambda request, *, timeout: partial,  # type: ignore[arg-type]
     )
 
-    assert list(client.stream("Привет", [])) == ["Текстовый помощник временно недоступен. Повторите запрос позже."]
+    iterator = client.stream("Привет", [])
+    assert next(iterator) == "partial"
+    with pytest.raises(ValueError, match="ended before done"):
+        next(iterator)
     assert partial.closed is True
 
 
-def test_api_assistant_client_rejects_cumulative_answer_overflow_before_yield() -> None:
+def test_api_assistant_client_stops_after_cumulative_answer_overflow() -> None:
     oversized = _SseResponse(
         (
             *_sse("start", 1, '{"v":1,"sequence":1}'),
@@ -739,7 +742,10 @@ def test_api_assistant_client_rejects_cumulative_answer_overflow_before_yield() 
         opener=lambda request, *, timeout: oversized,  # type: ignore[arg-type]
     )
 
-    assert list(client.stream("Привет", [])) == ["Текстовый помощник временно недоступен. Повторите запрос позже."]
+    iterator = client.stream("Привет", [])
+    assert next(iterator) == "x" * 5_000
+    with pytest.raises(ValueError, match="answer exceeded bound"):
+        next(iterator)
 
 
 def test_api_assistant_client_returns_only_unavailable_error_when_provider_fails() -> None:

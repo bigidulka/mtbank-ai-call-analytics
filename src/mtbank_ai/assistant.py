@@ -251,21 +251,32 @@ class DemoAssistant:
                 messages.append(ModelMessage(role=MessageRole.USER, content=_FINAL_TURN_INSTRUCTION))
                 sequence += 1
                 yield AssistantStreamEvent(sequence=sequence, type="progress", phase="model")
+                final_remaining_output = max_output - total_output_tokens
+                if final_remaining_output <= 0:
+                    raise AgentRuntimeError(AgentFailureCode.BUDGET_EXCEEDED)
                 final_request = ModelRequest(
                     model_id=model_id,
                     reasoning_effort=self._runtime_settings.gateway.models.default_reasoning_effort,
                     messages=tuple(messages),
                     tools=(),
                     tool_choice=ToolChoice.NONE,
-                    max_output_tokens=remaining_output,
+                    max_output_tokens=final_remaining_output,
                     temperature=0.2,
                 )
-                final_response, final_events = await self._stream_final_turn(
+                final_response: ModelResponse | None = None
+                async for item in self._stream_final_turn(
                     final_request,
                     deadline_at=deadline_at,
                     model_id=model_id,
                     start_sequence=sequence,
-                )
+                ):
+                    if isinstance(item, ModelResponse):
+                        final_response = item
+                    else:
+                        sequence = item.sequence
+                        yield item
+                if final_response is None:
+                    raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE)
                 total_input_tokens += final_response.usage.input_tokens
                 total_output_tokens += final_response.usage.output_tokens
                 total_cost_usd += _usage_cost(final_response.usage, self._runtime_settings)
@@ -275,9 +286,6 @@ class DemoAssistant:
                     or total_cost_usd > self._runtime_settings.default_max_cost_usd
                 ):
                     raise AgentRuntimeError(AgentFailureCode.BUDGET_EXCEEDED)
-                for event in final_events:
-                    sequence = event.sequence
-                    yield event
                 sequence += 1
                 yield AssistantStreamEvent(sequence=sequence, type="done")
                 return
@@ -361,37 +369,36 @@ class DemoAssistant:
         deadline_at: datetime,
         model_id: str,
         start_sequence: int,
-    ) -> tuple[ModelResponse, tuple[AssistantStreamEvent, ...]]:
+    ) -> AsyncIterator[AssistantStreamEvent | ModelResponse]:
         stream = getattr(self._model_client, "stream", None)
         if not callable(stream):
             response = await self._model_client.complete(request, deadline_at=deadline_at)
             _validate_final_response(response, model_id=model_id)
             assert response.text_content is not None
-            return response, (
-                AssistantStreamEvent(sequence=start_sequence + 1, type="delta", text=response.text_content),
-            )
+            yield AssistantStreamEvent(sequence=start_sequence + 1, type="delta", text=response.text_content)
+            yield response
+            return
 
         typed_stream = cast(AsyncIterator[ModelStreamEvent], stream(request, deadline_at=deadline_at))
         pending = ""
-        visible_parts: list[str] = []
-        visible_chars = 0
-        public_events: list[AssistantStreamEvent] = []
+        emitted_parts: list[str] = []
+        emitted_chars = 0
         completed: ModelResponse | None = None
         sequence = start_sequence
         async for event in typed_stream:
             if event.type is ModelStreamEventType.TEXT_DELTA:
                 assert event.text_delta is not None
                 pending += event.text_delta
-                if visible_chars + len(pending) > _MAX_ANSWER_CHARS:
+                if emitted_chars + len(pending) > _MAX_ANSWER_CHARS:
                     raise AgentRuntimeError(AgentFailureCode.TEXT_COMPLETION_REJECTED)
                 emit_count = len(pending) - _STREAM_HOLDBACK_CHARS
                 if emit_count > 0:
                     delta = pending[:emit_count]
                     pending = pending[emit_count:]
-                    visible_parts.append(delta)
-                    visible_chars += len(delta)
+                    emitted_parts.append(delta)
+                    emitted_chars += len(delta)
                     sequence += 1
-                    public_events.append(AssistantStreamEvent(sequence=sequence, type="delta", text=delta))
+                    yield AssistantStreamEvent(sequence=sequence, type="delta", text=delta)
             elif event.type is ModelStreamEventType.COMPLETED:
                 completed = event.response
             else:
@@ -400,12 +407,12 @@ class DemoAssistant:
             raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE)
         _validate_final_response(completed, model_id=model_id)
         assert completed.text_content is not None
-        emitted = "".join(visible_parts) + pending
+        emitted = "".join(emitted_parts) + pending
         _validate_streamed_final_answer(completed.text_content, emitted)
         if pending:
             sequence += 1
-            public_events.append(AssistantStreamEvent(sequence=sequence, type="delta", text=pending))
-        return completed, tuple(public_events)
+            yield AssistantStreamEvent(sequence=sequence, type="delta", text=pending)
+        yield completed
 
     async def _execute_tools(
         self,

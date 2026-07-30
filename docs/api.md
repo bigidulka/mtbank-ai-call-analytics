@@ -18,8 +18,9 @@ Disconnect отменяет provider/tool work; partial text не сопрово
 ошибки. OpenWebUI Pipeline проверяет event order/schema/byte-count и отдаёт deltas как
 generator. Tool-selection turns остаются private. После выбора tools runtime запускает отдельный
 no-tools final turn и выпускает его text deltas с небольшим safety holdback; terminal
-`stop`, exact final text и общий лимит 8000 символов проверяются до `done`, а
-tool-protocol markers отклоняются. Trends tool допускает один reviewed-topic query
+`stop`, exact final text и общий лимит 8000 символов проверяются до `done`; после
+первого bounded holdback deltas идут сразу через SSE и Pipeline, а tool-protocol markers
+отклоняются. Trends tool допускает один reviewed-topic query
 на assistant request и скрывает малые cohorts/точные counts. Buffered `POST /assistant`
 сохранён для compatibility.
 
