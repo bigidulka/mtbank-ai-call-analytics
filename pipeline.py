@@ -966,14 +966,89 @@ def _render_probe(probes: list[tuple[str, int, str]], *, display_name: str) -> s
 
 
 def _render_analysis_response(response: object, *, display_name: str) -> str:
-    model_dump = getattr(response, "model_dump", None)
-    if not callable(model_dump):
-        raise ValueError("analysis response не поддерживает canonical JSON serialization")
-    payload = model_dump(mode="json")
-    if not isinstance(payload, dict):
-        raise ValueError("analysis response должен быть JSON object")
-    rendered = json.dumps(payload, ensure_ascii=False, indent=2)
-    return f"## {html.escape(display_name, quote=True)}\n\n<pre>{html.escape(rendered, quote=True)}</pre>"
+    if not isinstance(response, AnalyzeResponse):
+        model_dump = getattr(response, "model_dump", None)
+        if not callable(model_dump):
+            raise ValueError("analysis response не поддерживает canonical JSON serialization")
+        rendered = json.dumps(model_dump(mode="json"), ensure_ascii=False, indent=2)
+        return f"## {_markdown_text(display_name)}\n\n```json\n{_markdown_text(rendered)}\n```"
+
+    priority_labels = {"low": "низкий", "medium": "средний", "high": "высокий", "critical": "критический"}
+    checklist = response.quality_score.checklist
+    transcript = "\n".join(
+        f"**{_markdown_text(segment.speaker)}** "
+        f"`{_format_timestamp(segment.start)}–{_format_timestamp(segment.end)}`  \n"
+        f"{_markdown_text(segment.text)}"
+        for segment in response.transcript
+    )
+    actions = "\n".join(f"{index}. {_markdown_text(item)}" for index, item in enumerate(response.action_items, 1))
+    if not actions:
+        actions = "Дальнейшие действия не определены."
+    if response.compliance.issues:
+        compliance = "\n".join(
+            f"- **{_markdown_text(issue.severity.value)} — {_markdown_text(issue.rule_id)}:** "
+            f"{_markdown_text(issue.explanation)}"
+            for issue in response.compliance.issues
+        )
+    else:
+        compliance = "Нарушений по проверяемой политике не обнаружено."
+    canonical_json = json.dumps(response.model_dump(mode="json"), ensure_ascii=False, indent=2)
+
+    return "\n".join(
+        (
+            f"## {_markdown_text(display_name)}",
+            "",
+            "### Итог",
+            _markdown_text(response.summary),
+            "",
+            "### Классификация",
+            f"- **Тема:** {_markdown_text(response.classification.topic)}",
+            "- **Приоритет:** "
+            + _markdown_text(priority_labels.get(response.classification.priority, response.classification.priority)),
+            f"- **Уверенность:** {response.classification.confidence:.0%}",
+            f"- **Обоснование:** {_markdown_text(response.classification.rationale)}",
+            "",
+            "### Качество обслуживания",
+            f"- **Итоговая оценка:** {response.quality_score.total:.0f}/100",
+            f"- Приветствие: {_pass_mark(checklist.greeting)}",
+            f"- Выявление потребности: {_pass_mark(checklist.need_detection)}",
+            f"- Решение предоставлено: {_pass_mark(checklist.solution_provided)}",
+            f"- Завершение разговора: {_pass_mark(checklist.farewell)}",
+            "",
+            "### Compliance",
+            compliance,
+            "",
+            "### Рекомендуемые действия",
+            actions,
+            "",
+            "### Транскрипт",
+            transcript,
+            "",
+            "<details>",
+            "<summary>Технический JSON результата</summary>",
+            "",
+            "```json",
+            canonical_json,
+            "```",
+            "</details>",
+            "",
+            f"_Run ID: `{response.meta.run_id}` · Обработка: {response.meta.processing_ms / 1000:.1f} с · "
+            f"Needs review: {'да' if response.meta.needs_review else 'нет'}_",
+        )
+    )
+
+
+def _format_timestamp(seconds: float) -> str:
+    whole = max(0, int(seconds))
+    return f"{whole // 60:02d}:{whole % 60:02d}"
+
+
+def _pass_mark(value: bool) -> str:
+    return "✅" if value else "❌"
+
+
+def _markdown_text(value: object) -> str:
+    return str(value).replace("\\", "\\\\").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _bounded_assistant_history(messages: list[dict[str, Any]]) -> list[dict[str, str]]:

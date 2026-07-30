@@ -12,7 +12,7 @@ import pytest
 
 from mtbank_ai.application.ports import FileAnalyzeInput
 from mtbank_ai.domain.errors import DomainError, ErrorCode
-from mtbank_ai.workflow.pipeline_adapter import OpenWebUIAnalysisAdapter, render_openwebui_analysis
+from mtbank_ai.workflow.pipeline_adapter import OpenWebUIAnalysisAdapter
 from pipeline import ApiAnalysisClient, Pipeline, VerifiedAudio
 
 REQUEST_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -187,10 +187,8 @@ def test_pipeline_adapter_uses_verified_bytes_and_escapes_public_response() -> N
     assert adapter.request_ids[0].version == 4
     assert "&lt;script&gt;untrusted&lt;/script&gt;" in rendered
     assert "<script>" not in rendered
-    assert rendered == render_openwebui_analysis(
-        RenderableResponse({"summary": "<script>untrusted</script>"}),  # type: ignore[arg-type]
-        display_name=pipeline.name,
-    )
+    assert rendered.startswith("## MTBank Attachment Probe\n\n```json\n")
+    assert rendered.endswith("\n```")
 
 
 def test_internal_api_adapter_sends_verified_audio_only_to_pinned_origin() -> None:
