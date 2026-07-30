@@ -16,7 +16,7 @@ AI-система для транскрибации и многоагентно�
 0. Войти временными evaluator credentials из сообщения со ссылкой.
 1. Открыть [публичный OpenWebUI](https://mtbank.arbitron.dev).
 2. Выбрать модель **MTBank Attachment Probe**.
-3. Написать текстовый вопрос — отдельный bounded LLM-agent объяснит форматы, API, streaming, Grafana и сценарий проверки с учётом истории диалога.
+3. Написать текстовый вопрос — отдельный bounded multi-turn LLM-agent сам выберет safe read-only tools и отдаст ответ token-by-token с учётом истории диалога.
 4. Загрузить [`test_data/synthetic/mobile-app-security-16k.ogg`](test_data/synthetic/mobile-app-security-16k.ogg).
 5. Получить единый результат: transcript с timestamps и ролями, classification, quality checklist, compliance, summary, action items.
 6. Открыть [Grafana](https://mtbank.arbitron.dev/grafana/) для метрик звонков, качества и тематик.
@@ -90,7 +90,7 @@ WebSocket partials создаются bounded rolling GPU windows; финаль�
 
 ## Что отличает решение
 
-- **LLM-помощник внутри demo:** отдельный bounded text-agent использует историю чата, отвечает через тот же OpenAI-compatible gateway и не зависит от speech runtime.
+- **LLM-помощник внутри demo:** bounded autonomous multi-turn agent использует static safe tools, parallel reads, repeated-call guards и token streaming через SSE → OpenWebUI generator; raw tool protocol и hidden reasoning не публикуются.
 - **Не FastAPI-заглушка:** production flow проходит через обязательный OpenWebUI Pipeline.
 - **Один результат для UI и API:** отсутствует расхождение между demo и backend workflow.
 - **Не только WER:** отдельно измеряются DER, role accuracy и speaker-attributed WER.

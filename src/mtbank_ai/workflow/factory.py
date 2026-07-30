@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from mtbank_ai.agent_runtime import ConfiguredOpenAICompatibleGateway
 from mtbank_ai.agents import CoreAgents
-from mtbank_ai.assistant import DemoAssistant
+from mtbank_ai.assistant import AssistantRuntimePort, AssistantTrendsPort, DemoAssistant
 from mtbank_ai.config import Settings
 from mtbank_ai.observability import Telemetry
 from mtbank_ai.policies import PolicyRegistry
@@ -17,13 +17,24 @@ from mtbank_ai.workflow.analysis import AnalysisWorkflow
 from mtbank_ai.workflow.fetch import SafeUrlFetcher, UrlFetchPolicy
 
 
-def build_configured_demo_assistant(settings: Settings, *, telemetry: Telemetry | None = None) -> DemoAssistant | None:
+def build_configured_demo_assistant(
+    settings: Settings,
+    *,
+    telemetry: Telemetry | None = None,
+    runtime_port: AssistantRuntimePort | None = None,
+    trends_port: AssistantTrendsPort | None = None,
+) -> DemoAssistant | None:
     """Builds text-only demo assistant independently from speech readiness."""
 
     if settings.agent_runtime is None:
         return None
     gateway = ConfiguredOpenAICompatibleGateway(settings.agent_runtime.gateway, telemetry=telemetry)
-    return DemoAssistant(gateway, settings.agent_runtime)
+    return DemoAssistant(
+        gateway,
+        settings.agent_runtime,
+        runtime_port=runtime_port,
+        trends_port=trends_port,
+    )
 
 
 def build_configured_analysis_workflow(

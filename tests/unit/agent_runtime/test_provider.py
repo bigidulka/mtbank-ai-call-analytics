@@ -373,6 +373,24 @@ def test_provider_stream_rejects_cumulative_text_and_tool_argument_overflow() ->
         assert stream.closed is True
 
 
+def test_provider_stream_rejects_excessive_empty_chunks() -> None:
+    chunks = tuple(
+        SimpleNamespace(id="request-1", model="configured-model", choices=(), usage=None) for _ in range(1_025)
+    )
+    stream = FakeStream(chunks)
+    provider = OpenAICompatibleProvider(_settings(), client=StreamingFakeClient((stream,)), now=lambda: NOW)
+
+    async def consume() -> None:
+        async for _event in provider.stream(_request(), deadline_at=NOW + timedelta(seconds=10)):
+            pass
+
+    with pytest.raises(ProviderError) as error:
+        asyncio.run(consume())
+
+    assert error.value.code is AgentFailureCode.MALFORMED_PROVIDER_RESPONSE
+    assert stream.closed is True
+
+
 def test_provider_stream_rejects_model_drift_and_closes_stream() -> None:
     stream = FakeStream(
         (

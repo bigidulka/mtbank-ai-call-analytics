@@ -1,5 +1,28 @@
 # API contract
 
+## Assistant
+
+`POST /assistant` и `POST /assistant/stream` используют тот же bearer token, message
+до 2000 символов и максимум восемь history messages. Buffered endpoint возвращает
+`{"answer","model_id"}`. Streaming endpoint возвращает SSE `v=1`:
+
+- `start`;
+- `progress` только с safe phase и allowlisted tool label;
+- `delta` только с visible final-answer text;
+- `done`;
+- `error` с публичным code/message/retryable после уже отправленных headers.
+
+`id` и `sequence` возрастают локально. Provider/tool IDs, arguments, observations,
+prompt, transcript, model metadata и hidden reasoning не входят в public stream.
+Disconnect отменяет provider/tool work; partial text не сопровождается `done` после
+ошибки. OpenWebUI Pipeline проверяет event order/schema/byte-count и отдаёт deltas как
+generator. Ответ целиком валидируется и ограничивается 8000 символами до первого public
+delta; tool-protocol markers отклоняются. Trends tool допускает один reviewed-topic query
+на assistant request и скрывает малые cohorts/точные counts. Buffered `POST /assistant`
+сохранён для compatibility.
+
+## Analyze
+
 `POST /analyze` остаётся internal-only до утверждения внешнего ingress. Требуется
 `Authorization: Bearer <MTBANK_API_KEY>` и ровно один из источников:
 

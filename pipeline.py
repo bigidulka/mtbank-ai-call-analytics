@@ -9,8 +9,8 @@ import json
 import os
 import re
 import threading
-from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar
+from collections.abc import Callable, Generator, Mapping
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 from uuid import UUID, uuid4
@@ -43,6 +43,8 @@ _TRUSTED_ANALYSIS_API_INTERNAL_URL = "http://api:8000"
 _JSON_RESPONSE_MAX_BYTES = 1 * 1024 * 1024
 _TEXT_ASSISTANT_MAX_HISTORY_MESSAGES = 8
 _TEXT_ASSISTANT_MAX_MESSAGE_CHARS = 2_000
+_TEXT_ASSISTANT_MAX_STREAM_BYTES = 64 * 1024
+_TEXT_ASSISTANT_MAX_STREAM_EVENTS = 1_024
 _ATTACHMENT_UNAVAILABLE_MESSAGE = "Вложение недоступно. Загрузите файл заново и повторите запрос."
 _TEXT_ASSISTANT_UNAVAILABLE_MESSAGE = "Текстовый помощник временно недоступен. Повторите запрос позже."
 _TEXT_ASSISTANT_MARKER = "text_assistant"
@@ -332,6 +334,111 @@ class ApiAssistantClient:
         self._timeout_seconds = timeout_seconds
         self._opener = opener or build_trusted_opener(self._base_url)
 
+    def stream(self, message: str, history: list[dict[str, str]]) -> Generator[str, None, None]:
+        payload = json.dumps(
+            {"message": message[:_TEXT_ASSISTANT_MAX_MESSAGE_CHARS], "history": history},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        request = Request(
+            f"{self._base_url}/assistant/stream",
+            data=payload,
+            headers={
+                "Accept": "text/event-stream",
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Length": str(len(payload)),
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        emitted = False
+        try:
+            with self._opener(request, timeout=self._timeout_seconds) as response:
+                for text in self._parse_stream(response):
+                    emitted = True
+                    yield text
+        except (HTTPError, URLError, OSError, TrustedHttpError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
+            if not emitted:
+                yield _TEXT_ASSISTANT_UNAVAILABLE_MESSAGE
+            else:
+                raise
+
+    @staticmethod
+    def _parse_stream(response: Any) -> Generator[str, None, None]:
+        expected_sequence = 1
+        event_name: str | None = None
+        data_line: str | None = None
+        total_bytes = 0
+        event_count = 0
+        answer_chars = 0
+        answer_parts: list[str] = []
+        saw_start = False
+        saw_done = False
+
+        for raw_line in _bounded_response_lines(response, limit=_JSON_RESPONSE_MAX_BYTES):
+            if not isinstance(raw_line, bytes):
+                raise ValueError("assistant SSE line is invalid")
+            total_bytes += len(raw_line)
+            if total_bytes > _TEXT_ASSISTANT_MAX_STREAM_BYTES:
+                raise ValueError("assistant SSE stream exceeded bound")
+            line = raw_line.decode("utf-8").rstrip("\r\n")
+            if line.startswith("id: "):
+                try:
+                    event_id = int(line.removeprefix("id: "))
+                except ValueError:
+                    raise ValueError("assistant SSE ID is invalid") from None
+                if event_id != expected_sequence:
+                    raise ValueError("assistant SSE ID is invalid")
+            elif line.startswith("event: "):
+                event_name = line.removeprefix("event: ")
+            elif line.startswith("data: "):
+                data_line = line.removeprefix("data: ")
+            elif not line:
+                if event_name is None or data_line is None:
+                    raise ValueError("assistant SSE event is incomplete")
+                event_count += 1
+                if event_count > _TEXT_ASSISTANT_MAX_STREAM_EVENTS:
+                    raise ValueError("assistant SSE event count exceeded bound")
+                parsed = json.loads(data_line)
+                if not isinstance(parsed, Mapping) or parsed.get("v") != 1:
+                    raise ValueError("assistant SSE event is invalid")
+                sequence = parsed.get("sequence")
+                if type(sequence) is not int or sequence != expected_sequence:
+                    raise ValueError("assistant SSE sequence is invalid")
+                expected_sequence += 1
+                if event_name == "start":
+                    if saw_start or event_count != 1 or set(parsed) != {"v", "sequence"}:
+                        raise ValueError("assistant SSE start is invalid")
+                    saw_start = True
+                elif event_name == "progress":
+                    _validate_assistant_progress(parsed, saw_start=saw_start, saw_done=saw_done)
+                elif event_name == "delta":
+                    if not saw_start or saw_done or set(parsed) != {"v", "sequence", "text"}:
+                        raise ValueError("assistant SSE delta is invalid")
+                    text = parsed.get("text")
+                    if not isinstance(text, str) or not text or len(text) > 8_000:
+                        raise ValueError("assistant SSE delta is invalid")
+                    answer_chars += len(text)
+                    if answer_chars > 8_000:
+                        raise ValueError("assistant SSE answer exceeded bound")
+                    answer_parts.append(text)
+                elif event_name == "done":
+                    if not saw_start or saw_done or set(parsed) != {"v", "sequence"}:
+                        raise ValueError("assistant SSE done is invalid")
+                    saw_done = True
+                elif event_name == "error":
+                    _validate_assistant_error(parsed, saw_start=saw_start, saw_done=saw_done)
+                    raise ValueError("assistant SSE failed")
+                else:
+                    raise ValueError("assistant SSE event type is invalid")
+                event_name = None
+                data_line = None
+            elif not line.startswith(":"):
+                raise ValueError("assistant SSE field is invalid")
+        if event_name is not None or data_line is not None or not saw_start or not saw_done or not answer_parts:
+            raise ValueError("assistant SSE stream ended before done")
+        yield from answer_parts
+
     def answer(self, message: str, history: list[dict[str, str]]) -> str:
         payload = json.dumps(
             {"message": message[:_TEXT_ASSISTANT_MAX_MESSAGE_CHARS], "history": history},
@@ -357,6 +464,56 @@ class ApiAssistantClient:
         if not isinstance(answer, str) or not answer.strip() or len(answer) > 8_000:
             return _TEXT_ASSISTANT_UNAVAILABLE_MESSAGE
         return answer.strip()
+
+
+def _bounded_response_lines(response: Any, *, limit: int) -> Generator[bytes, None, None]:
+    readline = getattr(response, "readline", None)
+    if callable(readline):
+        while True:
+            line = readline(limit + 1)
+            if not isinstance(line, bytes):
+                raise ValueError("assistant SSE line is invalid")
+            if not line:
+                return
+            if len(line) > limit:
+                raise ValueError("assistant SSE line is invalid")
+            yield line
+        return
+    for line in response:
+        if not isinstance(line, bytes) or len(line) > limit:
+            raise ValueError("assistant SSE line is invalid")
+        yield line
+
+
+def _validate_assistant_progress(payload: Mapping[str, object], *, saw_start: bool, saw_done: bool) -> None:
+    if not saw_start or saw_done:
+        raise ValueError("assistant SSE progress is out of order")
+    phase = payload.get("phase")
+    if phase == "model":
+        if set(payload) != {"v", "sequence", "phase"}:
+            raise ValueError("assistant SSE model progress is invalid")
+        return
+    if phase == "tool":
+        tool_name = payload.get("tool_name")
+        if set(payload) != {"v", "sequence", "phase", "tool_name"} or tool_name not in {
+            "demo_capabilities",
+            "runtime_metadata",
+            "trends_query",
+        }:
+            raise ValueError("assistant SSE tool progress is invalid")
+        return
+    raise ValueError("assistant SSE progress phase is invalid")
+
+
+def _validate_assistant_error(payload: Mapping[str, object], *, saw_start: bool, saw_done: bool) -> None:
+    if not saw_start or saw_done or set(payload) != {"v", "sequence", "code", "message", "retryable"}:
+        raise ValueError("assistant SSE error is invalid")
+    if (
+        not isinstance(payload.get("code"), str)
+        or not isinstance(payload.get("message"), str)
+        or type(payload.get("retryable")) is not bool
+    ):
+        raise ValueError("assistant SSE error fields are invalid")
 
 
 class Pipeline:
@@ -451,12 +608,15 @@ class Pipeline:
         model_id: str,
         messages: list[dict[str, Any]],
         body: dict[str, Any],
-    ) -> str:
+    ) -> str | Generator[str, None, None]:
         """Возвращает обычный text/SSE-compatible ответ для проверенного аудио."""
 
         del model_id
         if body.get("mtbank_text_assistant") == _TEXT_ASSISTANT_MARKER:
             client = self._assistant_client or self._create_assistant_client()
+            stream = getattr(client, "stream", None)
+            if callable(stream):
+                return cast(Generator[str, None, None], stream(user_message, _bounded_assistant_history(messages)))
             return client.answer(user_message, _bounded_assistant_history(messages))
         if body.get("mtbank_attachment_error") or "mtbank_attachment_ref" not in body:
             return _controlled_message(self.name, _ATTACHMENT_UNAVAILABLE_MESSAGE)

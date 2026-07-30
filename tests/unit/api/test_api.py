@@ -10,10 +10,12 @@ import pytest
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import SecretStr
 
+from mtbank_ai.agent_runtime import AgentFailureCode, AgentRuntimeError
 from mtbank_ai.api.dependencies import require_api_key
 from mtbank_ai.api.main import create_app
+from mtbank_ai.api.routes.assistant import DisconnectAwareStreamingResponse
 from mtbank_ai.application.ports import AnalyzeInput, FileAnalyzeInput, UrlAnalyzeInput
-from mtbank_ai.assistant import AssistantRequest, AssistantResponse
+from mtbank_ai.assistant import AssistantRequest, AssistantResponse, AssistantStreamEvent
 from mtbank_ai.config import ApiSettings, DatabaseSettings, Settings
 from mtbank_ai.domain.agents import ComplianceSeverity
 from mtbank_ai.domain.analysis import (
@@ -83,8 +85,24 @@ class StubDemoAssistant:
         self.requests.append(request)
         return AssistantResponse(answer="Ответ настоящего помощника", model_id="assistant-model")
 
+    async def stream(self, request: AssistantRequest) -> AsyncIterator[AssistantStreamEvent]:
+        self.requests.append(request)
+        yield AssistantStreamEvent(sequence=1, type="start")
+        yield AssistantStreamEvent(sequence=2, type="progress", phase="model")
+        yield AssistantStreamEvent(sequence=3, type="delta", text="Ответ ")
+        yield AssistantStreamEvent(sequence=4, type="delta", text="потоком")
+        yield AssistantStreamEvent(sequence=5, type="done")
+
     async def close(self) -> None:
         return None
+
+
+class FailingStreamAssistant(StubDemoAssistant):
+    async def stream(self, request: AssistantRequest) -> AsyncIterator[AssistantStreamEvent]:
+        self.requests.append(request)
+        yield AssistantStreamEvent(sequence=1, type="start")
+        yield AssistantStreamEvent(sequence=2, type="progress", phase="model")
+        raise AgentRuntimeError(AgentFailureCode.PROVIDER_TRANSPORT)
 
 
 class InvalidResponseAnalyzer:
@@ -274,6 +292,85 @@ def test_assistant_is_bearer_protected_and_returns_model_answer() -> None:
         assert assistant.requests[0].history[0].content == "Привет"
 
     asyncio.run(scenario())
+
+
+def test_assistant_stream_is_bearer_protected_and_exposes_only_safe_sse_fields() -> None:
+    async def scenario() -> None:
+        assistant = StubDemoAssistant()
+        app = create_app(settings=_settings(), analyzer=StubAnalyzer(), readiness=Ready(), demo_assistant=assistant)  # type: ignore[arg-type]
+        payload = {"message": "Что ты умеешь?"}
+        assert (await _request(app, "POST", "/assistant/stream", json=payload)).status_code == 401
+        response = await _request(app, "POST", "/assistant/stream", json=payload, headers=_auth())
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        body = response.text
+        assert "event: start" in body
+        assert "event: progress" in body
+        assert "event: delta" in body
+        assert "event: done" in body
+        assert '"sequence":1' in body
+        assert '"text":"Ответ "' in body
+        assert "tool_arguments" not in body
+        assert "provider" not in body
+
+    asyncio.run(scenario())
+
+
+def test_assistant_stream_emits_monotonic_sanitized_error_after_headers() -> None:
+    async def scenario() -> None:
+        app = create_app(
+            settings=_settings(),
+            analyzer=StubAnalyzer(),
+            readiness=Ready(),
+            demo_assistant=FailingStreamAssistant(),  # type: ignore[arg-type]
+        )
+        response = await _request(
+            app,
+            "POST",
+            "/assistant/stream",
+            json={"message": "Что ты умеешь?"},
+            headers=_auth(),
+        )
+        assert response.status_code == 200
+        body = response.text
+        assert "id: 3\nevent: error" in body
+        assert '"sequence":3' in body
+        assert '"code":"provider_failure"' in body
+        assert "PROVIDER_TRANSPORT" not in body
+        assert "request_id" not in body
+
+    asyncio.run(scenario())
+
+
+def test_disconnect_aware_streaming_response_cancels_generator() -> None:
+    cancelled = asyncio.Event()
+    sent: list[dict[str, object]] = []
+
+    async def body() -> AsyncIterator[str]:
+        try:
+            yield "first"
+            await asyncio.sleep(60)
+        finally:
+            cancelled.set()
+
+    async def receive() -> dict[str, object]:
+        await asyncio.sleep(0)
+        return {"type": "http.disconnect"}
+
+    async def send(message: dict[str, object]) -> None:
+        sent.append(message)
+
+    async def scenario() -> None:
+        response = DisconnectAwareStreamingResponse(body(), media_type="text/event-stream")
+        await response(
+            {"type": "http", "asgi": {"version": "3.0", "spec_version": "2.4"}},  # type: ignore[arg-type]
+            receive,  # type: ignore[arg-type]
+            send,  # type: ignore[arg-type]
+        )
+
+    asyncio.run(scenario())
+    assert cancelled.is_set()
+    assert sent[0]["type"] == "http.response.start"
 
 
 def test_auth_rejects_missing_and_non_ascii_credentials() -> None:

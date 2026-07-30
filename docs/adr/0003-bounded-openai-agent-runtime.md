@@ -13,8 +13,9 @@ backoff, `Retry-After`, semaphore и circuit breaker принадлежат runt
 
 Каждый `AgentSpec` immutable и содержит exact model/policy/prompt versions,
 SHA-256 prompt bundle, typed terminal output, allowlist read-only tools, required
-retrieval tools, один terminal submit, максимум три turns и input/output/cost
-budgets. Runtime принимает только function calls: text completion, unknown or
+retrieval tools, один terminal submit, configurable максимум шесть turns (hard cap
+восемь), total/repeated tool-call guards и input/output/cost budgets. Runtime
+принимает только function calls: text completion, unknown or
 duplicate call, невалидные arguments, неразрешённый tool, post-terminal call,
 budget/deadline exhaustion и невалидный terminal output завершают run typed failure
 без partial success.
@@ -24,10 +25,19 @@ HTTP или MCP. Он содержит заранее внедрённые typed
 OpenAI function schemas. Наблюдения ограничены по размеру, canonical JSON и явно
 помечены `untrusted_tool_result` перед следующим model turn.
 
-Lifecycle events и returned trajectory содержат только IDs, hashes, tool names,
-statuses, usage и latency. Prompt, transcript, tool arguments, observation body,
-raw provider body и API key туда не попадают. Prompt registry отвергает traversal и
-symlink escape и хеширует canonical text plus reviewed policy/tool-schema inputs.
+На каждом turn модель видит все server-allowlisted read-only tools и terminal tool,
+сама выбирает zero/multiple calls через `tool_choice=auto`. Независимые read-only
+calls выполняются параллельно, observations возвращаются в provider order. Required
+evidence остаётся terminal invariant: retrieval должен завершиться в предыдущем turn,
+поэтому retrieval и terminal submit в одном response не дают обход авторизации.
+
+Provider streaming собирает fragmented tool calls только внутри trusted runtime; наружу
+выходят typed text deltas и validated completed response. Stream закрывается при normal
+completion, failure и cancellation; semaphore/circuit lifecycle завершается до terminal
+event. Lifecycle events и returned trajectory содержат только IDs, hashes, tool names,
+statuses, usage и latency. Prompt, transcript, tool arguments, observation body, raw
+provider body и API key туда не попадают. Prompt registry отвергает traversal и symlink
+escape и хеширует canonical text plus reviewed policy/tool-schema inputs.
 
 ## Capability и release gate
 
@@ -37,6 +47,13 @@ Offline unit tests передают явный scripted provider из tests; run
 provider или fallback. Live probe требует credentials и fail-closed при любой
 неподтверждённой capability.
 
-В этой сессии credentials намеренно отсутствуют. Реальный cloud capability probe и
-smoke/E2E с configured gateway обязательны перед release; локальные unit tests не
-являются заменой этому доказательству.
+Text assistant использует отдельный bounded multi-turn loop с static safe tools,
+streaming final-answer deltas, authenticated SSE и synchronous OpenWebUI generator.
+Промежуточный provider text tool-turns, arguments, observations и chain-of-thought не
+публикуются. Final text полностью проверяется и ограничивается до первого delta. Expensive
+nested Trends допускается один раз, restricted reviewed taxonomy, small cohorts suppressed,
+его usage/cost включаются в parent budget. Buffered `POST /assistant` сохранён как
+compatibility adapter поверх stream.
+
+Реальный cloud capability probe и smoke/E2E с configured gateway обязательны после
+изменений runtime; локальные unit tests не являются заменой этому доказательству.

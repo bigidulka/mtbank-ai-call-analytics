@@ -19,6 +19,12 @@ prompt, model and code revisions is required for reproducibility.
   Opus packets are rejected, while persistent FFmpeg input, output and stderr are bounded.
 - Cloud agents receive bounded/redacted inputs through one configured HTTPS gateway;
   retries, budgets, tool allowlists and terminal submission schemas are constrained.
+- Text assistant exposes only local SSE sequence, safe phase/tool labels and final-answer
+  deltas. Tool arguments/results, provider IDs/model metadata, prompts and hidden reasoning
+  stay inside runtime. Full final answer is validated and bounded before first public delta;
+  protocol markers are rejected. Disconnect cancels active provider/tool work; malformed,
+  oversized or partial SSE fails closed without a synthetic business answer. Assistant
+  Trends allows one reviewed-topic query and suppresses cohorts below privacy threshold.
 - PostgreSQL persistence and release evidence exclude raw content. Evidence hashes
   provider request IDs rather than retaining them.
 - CI does not print secrets and scheduled real E2E fails closed when secrets/config are

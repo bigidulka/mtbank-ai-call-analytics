@@ -13,7 +13,10 @@ monitoring-internal: Prometheus, Tempo, OpenTelemetry Collector, Grafana
 ```
 
 `gateway` — единственный host binding; API, speech, PostgreSQL и monitoring не
-публикуют порт хоста. Один shared workflow используется REST и OpenWebUI Pipeline:
+публикуют порт хоста. Text chat проходит `OpenWebUI Pipeline generator → authenticated
+/assistant/stream SSE → bounded model/tool loop → provider stream`; наружу выходят
+только safe progress и final-answer deltas. Buffered `/assistant` собирает тот же stream.
+Один shared speech workflow используется REST и OpenWebUI Pipeline:
 безопасная загрузка/normalization → canonical speech → четыре bounded agents
 (`classifier`, `quality`, `compliance`, `summarizer`) → deterministic aggregation →
 sanitary persistence.

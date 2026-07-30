@@ -90,6 +90,8 @@ def test_api_builds_shared_workflow_and_readiness_only_from_complete_configurati
         assert app.state.readiness._dependencies[1]._api_key is None
         assert isinstance(app.state.trends_agent, TrendsAgent)
         assert isinstance(app.state.demo_assistant, DemoAssistant)
+        assert app.state.demo_assistant._runtime_port is not None
+        assert app.state.demo_assistant._trends_port is not None
         async with app.router.lifespan_context(app):
             pass
 

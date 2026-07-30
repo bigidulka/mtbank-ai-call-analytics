@@ -244,9 +244,14 @@ class OpenAICompatibleProvider:
         text_parts: list[str] = []
         tool_parts: dict[int, _ToolCallParts] = {}
         text_chars = 0
+        chunk_count = 0
+        choice_count = 0
         tool_event_count = 0
         try:
             async for chunk in stream:
+                chunk_count += 1
+                if chunk_count > 1_024:
+                    raise ValueError("stream chunk count exceeded bound")
                 model_id = _stream_model_id(model_id, chunk)
                 request_id = _stream_request_id(request_id, chunk)
                 raw_usage = getattr(chunk, "usage", None)
@@ -256,7 +261,13 @@ class OpenAICompatibleProvider:
                         output_tokens=raw_usage.completion_tokens,
                         total_tokens=raw_usage.total_tokens,
                     )
-                for choice in getattr(chunk, "choices", ()) or ():
+                choices = getattr(chunk, "choices", ()) or ()
+                if not isinstance(choices, (list, tuple)) or len(choices) > 8:
+                    raise ValueError("stream choices exceeded bound")
+                choice_count += len(choices)
+                if choice_count > 1_024:
+                    raise ValueError("stream choices exceeded bound")
+                for choice in choices:
                     candidate_finish = getattr(choice, "finish_reason", None)
                     if candidate_finish is not None:
                         finish_reason = _require_remote_id(candidate_finish)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -29,9 +30,16 @@ from mtbank_ai.application.ports import (
     UnavailableAnalyzeCall,
     UnavailableReadiness,
 )
-from mtbank_ai.assistant import DemoAssistant
+from mtbank_ai.assistant import (
+    AssistantRuntimeMetadata,
+    AssistantRuntimePort,
+    AssistantTrendResult,
+    AssistantTrendsPort,
+    DemoAssistant,
+)
 from mtbank_ai.config import Settings
 from mtbank_ai.observability import Telemetry
+from mtbank_ai.policies import PolicyRegistry
 from mtbank_ai.speech.streaming import (
     InternalSpeechWebSocketAdapter,
     InternalSpeechWebSocketSettings,
@@ -40,7 +48,7 @@ from mtbank_ai.speech.streaming import (
     StreamingSpeechPort,
 )
 from mtbank_ai.storage.postgres import PostgresReadiness, create_postgres_engine
-from mtbank_ai.trends import TrendsAgent
+from mtbank_ai.trends import TrendRejected, TrendRequest, TrendsAgent
 from mtbank_ai.workflow.factory import (
     build_configured_analysis_workflow,
     build_configured_demo_assistant,
@@ -48,6 +56,63 @@ from mtbank_ai.workflow.factory import (
 )
 
 RequestHandler = Callable[[Request], Awaitable[Response]]
+
+
+class _AssistantReadinessTool(AssistantRuntimePort):
+    def __init__(self, readiness: ReadinessPort) -> None:
+        self._readiness = readiness
+
+    async def runtime_metadata(self) -> AssistantRuntimeMetadata:
+        ready = await self._readiness.ping()
+        return AssistantRuntimeMetadata(
+            status="ready" if ready else "unavailable",
+            detail="application-ready" if ready else "application-unavailable",
+        )
+
+
+class _AssistantTrendsTool(AssistantTrendsPort):
+    def __init__(self, agent: TrendsAgent, settings: Settings) -> None:
+        self._agent = agent
+        self._window_days = min(settings.trends.max_window_days, 30)
+        self._minimum_cohort_size = settings.trends.minimum_sample_size
+        self._allowed_topics = frozenset(topic.id for topic in PolicyRegistry().taxonomy.policy.topics)
+
+    async def query_trends(self, topic: str) -> AssistantTrendResult:
+        if topic not in self._allowed_topics:
+            return AssistantTrendResult(topic=topic, observation="unsupported-reviewed-topic")
+        window_end = datetime.now(UTC)
+        try:
+            result = await self._agent.analyze(
+                TrendRequest(
+                    window_start=window_end - timedelta(days=self._window_days),
+                    window_end=window_end,
+                    topic=topic,
+                )
+            )
+        except TrendRejected:
+            return AssistantTrendResult(topic=topic, observation="insufficient-sanitized-sample")
+        if result.numerator < self._minimum_cohort_size:
+            return AssistantTrendResult(topic=topic, observation="insufficient-sanitized-sample")
+        return AssistantTrendResult(
+            topic=topic,
+            observation=(
+                f"sample_bucket={_sample_bucket(result.denominator)}; "
+                f"support_bucket={_sample_bucket(result.numerator)}; "
+                "qualitative trend is available through the protected Trends API"
+            ),
+            model_usage=result.agent_evidence.usage,
+            cost_usd=result.agent_evidence.cost_usd,
+        )
+
+
+def _sample_bucket(value: int) -> str:
+    if value < 10:
+        return "5-9"
+    if value < 25:
+        return "10-24"
+    if value < 50:
+        return "25-49"
+    return "50+"
 
 
 def create_app(
@@ -114,6 +179,22 @@ def create_app(
             resolved_settings,
             engine=engine,
             telemetry=resolved_telemetry,
+        )
+    if demo_assistant is None and resolved_demo_assistant is not None:
+        awaitable_runtime_port = _AssistantReadinessTool(resolved_readiness)
+        trends_port = (
+            _AssistantTrendsTool(resolved_trends_agent, resolved_settings)
+            if resolved_trends_agent is not None
+            else None
+        )
+        resolved_demo_assistant = (
+            build_configured_demo_assistant(
+                resolved_settings,
+                telemetry=resolved_telemetry,
+                runtime_port=awaitable_runtime_port,
+                trends_port=trends_port,
+            )
+            or resolved_demo_assistant
         )
 
     @asynccontextmanager

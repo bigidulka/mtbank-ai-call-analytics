@@ -6,6 +6,8 @@ import io
 import threading
 import time
 import wave
+from collections.abc import Generator
+from typing import cast
 
 import pytest
 
@@ -584,6 +586,11 @@ class _AssistantClient:
         self.calls.append((message, history))
         return self.response
 
+    def stream(self, message: str, history: list[dict[str, str]]) -> Generator[str, None, None]:
+        self.calls.append((message, history))
+        yield "LLM "
+        yield "assistant response"
+
 
 def test_main_pipeline_text_assistant_calls_llm_with_bounded_sanitized_history() -> None:
     _FakeFileClient.reset()
@@ -603,12 +610,136 @@ def test_main_pipeline_text_assistant_calls_llm_with_bounded_sanitized_history()
         body=body,
     )
 
-    assert result == "LLM assistant response"
+    assert list(cast(Generator[str, None, None], result)) == ["LLM ", "assistant response"]
     assert assistant.calls[0][0] == "Что ты умеешь?"
     assert assistant.calls[0][1] == [
         {"role": "user" if index % 2 == 0 else "assistant", "content": f"message-{index}"} for index in range(3, 10)
     ]
     assert _FakeFileClient.instances == []
+
+
+class _SseResponse:
+    def __init__(self, lines: tuple[bytes, ...]) -> None:
+        self._lines = iter(lines)
+        self.closed = False
+
+    def __enter__(self) -> _SseResponse:
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.closed = True
+
+    def __iter__(self):  # type: ignore[no-untyped-def]
+        return self._lines
+
+    def readline(self, limit: int) -> bytes:
+        try:
+            line = next(self._lines)
+        except StopIteration:
+            return b""
+        return line if len(line) <= limit else line[:limit]
+
+
+def _sse(event: str, sequence: int, payload: str) -> tuple[bytes, ...]:
+    return (
+        f"id: {sequence}\n".encode(),
+        f"event: {event}\n".encode(),
+        f"data: {payload}\n".encode(),
+        b"\n",
+    )
+
+
+def test_api_assistant_client_parses_ordered_bounded_sse() -> None:
+    response = _SseResponse(
+        (
+            *_sse("start", 1, '{"v":1,"sequence":1}'),
+            *_sse("progress", 2, '{"v":1,"sequence":2,"phase":"model"}'),
+            *_sse("delta", 3, '{"v":1,"sequence":3,"text":"Первый "}'),
+            *_sse("delta", 4, '{"v":1,"sequence":4,"text":"ответ"}'),
+            *_sse("done", 5, '{"v":1,"sequence":5}'),
+        )
+    )
+    client = ApiAssistantClient(
+        base_url="http://api:8000",
+        api_key=API_KEY,
+        timeout_seconds=10,
+        opener=lambda request, *, timeout: response,  # type: ignore[arg-type]
+    )
+
+    assert list(client.stream("Привет", [])) == ["Первый ", "ответ"]
+    assert response.closed is True
+
+
+def test_api_assistant_client_rejects_oversized_line_before_full_read() -> None:
+    class OversizedResponse(_SseResponse):
+        def readline(self, limit: int) -> bytes:
+            return b"x" * limit
+
+    response = OversizedResponse(())
+    client = ApiAssistantClient(
+        base_url="http://api:8000",
+        api_key=API_KEY,
+        timeout_seconds=10,
+        opener=lambda request, *, timeout: response,  # type: ignore[arg-type]
+    )
+
+    assert list(client.stream("Привет", [])) == ["Текстовый помощник временно недоступен. Повторите запрос позже."]
+    assert response.closed is True
+
+
+def test_api_assistant_client_fails_closed_on_invalid_or_partial_sse() -> None:
+    invalid = _SseResponse(
+        (
+            *_sse("start", 1, '{"v":1,"sequence":1}'),
+            *_sse("delta", 3, '{"v":1,"sequence":3,"text":"must-not-complete"}'),
+        )
+    )
+    client = ApiAssistantClient(
+        base_url="http://api:8000",
+        api_key=API_KEY,
+        timeout_seconds=10,
+        opener=lambda request, *, timeout: invalid,  # type: ignore[arg-type]
+    )
+
+    assert list(client.stream("Привет", [])) == ["Текстовый помощник временно недоступен. Повторите запрос позже."]
+    assert invalid.closed is True
+
+
+def test_api_assistant_client_discards_partial_delta_without_done() -> None:
+    partial = _SseResponse(
+        (
+            *_sse("start", 1, '{"v":1,"sequence":1}'),
+            *_sse("delta", 2, '{"v":1,"sequence":2,"text":"partial"}'),
+        )
+    )
+    client = ApiAssistantClient(
+        base_url="http://api:8000",
+        api_key=API_KEY,
+        timeout_seconds=10,
+        opener=lambda request, *, timeout: partial,  # type: ignore[arg-type]
+    )
+
+    assert list(client.stream("Привет", [])) == ["Текстовый помощник временно недоступен. Повторите запрос позже."]
+    assert partial.closed is True
+
+
+def test_api_assistant_client_rejects_cumulative_answer_overflow_before_yield() -> None:
+    oversized = _SseResponse(
+        (
+            *_sse("start", 1, '{"v":1,"sequence":1}'),
+            *_sse("delta", 2, '{"v":1,"sequence":2,"text":"' + "x" * 5_000 + '"}'),
+            *_sse("delta", 3, '{"v":1,"sequence":3,"text":"' + "x" * 4_000 + '"}'),
+            *_sse("done", 4, '{"v":1,"sequence":4}'),
+        )
+    )
+    client = ApiAssistantClient(
+        base_url="http://api:8000",
+        api_key=API_KEY,
+        timeout_seconds=10,
+        opener=lambda request, *, timeout: oversized,  # type: ignore[arg-type]
+    )
+
+    assert list(client.stream("Привет", [])) == ["Текстовый помощник временно недоступен. Повторите запрос позже."]
 
 
 def test_api_assistant_client_returns_only_unavailable_error_when_provider_fails() -> None:
