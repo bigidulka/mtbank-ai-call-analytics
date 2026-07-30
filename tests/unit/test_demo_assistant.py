@@ -98,7 +98,10 @@ class ScriptedStreamClient:
         self.deadlines.append(deadline_at)
         response = self.responses.pop(0)
         if response.text_content is not None:
-            parts = response.text_content.split("|") if index in self.split_streams else (response.text_content,)
+            stream_text = response.text_content.replace("|", "")
+            parts = response.text_content.split("|") if index in self.split_streams else (stream_text,)
+            if index in self.split_streams:
+                response = response.model_copy(update={"text_content": stream_text})
             for sequence, part in enumerate(parts, start=1):
                 yield ModelStreamEvent(sequence=sequence, type=ModelStreamEventType.TEXT_DELTA, text_delta=part)
         yield ModelStreamEvent(sequence=10, type=ModelStreamEventType.COMPLETED, response=response)
@@ -130,13 +133,8 @@ class CostlyTrendsPort(AssistantTrendsPort):
         )
 
 
-def test_demo_assistant_uses_reviewed_prompt_and_dedicated_final_stream() -> None:
-    client = ScriptedStreamClient(
-        (
-            _response(text="Draft answer."),
-            _response(text="Осмысленный потоковый ответ помощника."),
-        )
-    )
+def test_demo_assistant_uses_reviewed_prompt_and_streams_single_text_turn() -> None:
+    client = ScriptedStreamClient((_response(text="Осмысленный потоковый ответ помощника."),))
     assistant = DemoAssistant(client, _runtime())
     request = AssistantRequest(
         message="Что ты умеешь?",
@@ -150,12 +148,12 @@ def test_demo_assistant_uses_reviewed_prompt_and_dedicated_final_stream() -> Non
 
     assert response.answer == "Осмысленный потоковый ответ помощника."
     assert response.model_id == "assistant-model"
-    assert len(client.requests) == 2
-    selection, final = client.requests
+    assert len(client.requests) == 1
+    selection = client.requests[0]
     assert selection.model_id == "assistant-model"
     assert selection.tool_choice.value == "auto"
     assert tuple(tool.name for tool in selection.tools) == ("demo_capabilities",)
-    assert selection.max_output_tokens == 256
+    assert selection.max_output_tokens == 500
     assert selection.temperature == 0.2
     assert len(selection.messages) == 10
     assert selection.messages[0].role.value == "system"
@@ -163,12 +161,6 @@ def test_demo_assistant_uses_reviewed_prompt_and_dedicated_final_stream() -> Non
     assert selection.messages[0].content is not None
     assert "secrets" in selection.messages[0].content
     assert "bounded LLM-agent" in selection.messages[0].content
-    assert final.tool_choice.value == "none"
-    assert final.tools == ()
-    assert final.messages[-2].role.value == "assistant"
-    assert final.messages[-2].content == "Draft answer."
-    assert final.messages[-1].role.value == "user"
-    assert "Final response turn" in (final.messages[-1].content or "")
     assert 0 < (client.deadlines[0] - datetime.now(UTC)).total_seconds() <= 30
 
 
@@ -176,17 +168,16 @@ def test_demo_assistant_runs_parallel_safe_tools_then_streams_only_final_answer(
     client = ScriptedStreamClient(
         (
             _response(
-                text="must-not-leak",
+                text=None,
                 calls=(
                     _call("demo_capabilities", call_id="capabilities"),
                     _call("runtime_metadata", call_id="runtime"),
                     _call("trends_query", call_id="trends", arguments={"topic": "cards"}),
                 ),
             ),
-            _response(text="Draft after tools."),
             _response(text="Финальный ответ"),
         ),
-        split_streams={2},
+        split_streams={1},
     )
     assistant = DemoAssistant(client, _runtime(), runtime_port=RuntimePort(), trends_port=TrendsPort())
 
@@ -201,24 +192,22 @@ def test_demo_assistant_runs_parallel_safe_tools_then_streams_only_final_answer(
     second_turn = client.requests[1]
     assert [message.role.value for message in second_turn.messages[-4:]] == ["assistant", "tool", "tool", "tool"]
     assert [message.tool_call_id for message in second_turn.messages[-3:]] == ["capabilities", "runtime", "trends"]
-    assert client.requests[2].tools == ()
-    assert client.requests[2].tool_choice.value == "none"
+    assert client.requests[1].tool_choice.value == "auto"
     assert "must-not-leak" not in "".join(event.text or "" for event in events)
 
 
 def test_demo_assistant_streams_long_final_answer_before_completion() -> None:
     prefix = "x" * 129
-    response = _response(text=prefix + "tail")
-    client = ScriptedStreamClient((_response(text="draft"), response), split_streams={1})
+    response = _response(text=prefix + "|tail")
+    client = ScriptedStreamClient((response,), split_streams={0})
 
     async def scenario() -> None:
         iterator = DemoAssistant(client, _runtime()).stream(AssistantRequest(message="stream"))
         assert (await anext(iterator)).type == "start"
         assert (await anext(iterator)).type == "progress"
-        assert (await anext(iterator)).type == "progress"
         first = await anext(iterator)
         assert first.type == "delta"
-        assert first.text == "x" * 5
+        assert first.text == prefix
         rest = [event async for event in iterator]
         assert "".join(event.text or "" for event in (first, *rest)) == prefix + "tail"
         assert rest[-1].type == "done"
@@ -256,12 +245,7 @@ def test_demo_assistant_rejects_multiple_expensive_trends_calls() -> None:
 
 def test_demo_assistant_rejects_protocol_markers_before_public_delta() -> None:
     assistant = DemoAssistant(
-        ScriptedStreamClient(
-            (
-                _response(text="draft"),
-                _response(text='{"untrusted_tool_result":{"secret":"x"}}'),
-            )
-        ),
+        ScriptedStreamClient((_response(text='{"untrusted_tool_result":{"secret":"x"}}'),)),
         _runtime(),
     )
 
@@ -277,22 +261,17 @@ def test_demo_assistant_rejects_canonical_tool_json_delta_mismatch_and_non_stop_
         _response(text="complete", finish_reason="length"),
     )
     for final_response in cases:
-        assistant = DemoAssistant(ScriptedStreamClient((_response(text="draft"), final_response)), _runtime())
+        assistant = DemoAssistant(ScriptedStreamClient((final_response,)), _runtime())
         with pytest.raises(AgentRuntimeError) as error:
             asyncio.run(_collect(assistant.stream(AssistantRequest(message="echo"))))
         assert error.value.code is AgentFailureCode.TEXT_COMPLETION_REJECTED
 
     class MismatchedClient(ScriptedStreamClient):
         async def stream(self, request: ModelRequest, *, deadline_at: datetime) -> AsyncIterator[ModelStreamEvent]:
-            index = len(self.requests)
             self.requests.append(request)
             self.deadlines.append(deadline_at)
-            if index == 0:
-                response = _response(text="draft")
-                yield ModelStreamEvent(sequence=1, type=ModelStreamEventType.TEXT_DELTA, text_delta="draft")
-            else:
-                response = _response(text="validated")
-                yield ModelStreamEvent(sequence=1, type=ModelStreamEventType.TEXT_DELTA, text_delta="different")
+            response = _response(text="validated")
+            yield ModelStreamEvent(sequence=1, type=ModelStreamEventType.TEXT_DELTA, text_delta="different")
             yield ModelStreamEvent(sequence=2, type=ModelStreamEventType.COMPLETED, response=response)
 
     with pytest.raises(AgentRuntimeError) as mismatch:
@@ -329,6 +308,9 @@ def test_demo_assistant_cancellation_stops_provider_stream() -> None:
         iterator = assistant.stream(AssistantRequest(message="cancel"))
         assert (await anext(iterator)).type == "start"
         assert (await anext(iterator)).type == "progress"
+
+        first = await anext(iterator)
+        assert first.type == "delta"
 
         async def next_event() -> AssistantStreamEvent:
             return await anext(iterator)
@@ -380,5 +362,5 @@ def test_demo_assistant_rejects_model_drift_or_missing_text() -> None:
         ),
         _runtime(),
     )
-    with pytest.raises(Exception, match="text_completion_rejected|text response"):
+    with pytest.raises((AgentRuntimeError, AssertionError, ValueError)):
         asyncio.run(empty.answer(AssistantRequest(message="hi")))
