@@ -317,6 +317,79 @@ def test_circuit_breaker_opens_deterministically_after_failure() -> None:
     assert getattr(error.value, "code") is AgentFailureCode.CIRCUIT_OPEN
 
 
+def test_stream_retries_transient_failure_before_first_event() -> None:
+    class FlakyStreamingClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete(self, request: ModelRequest, *, deadline_at: datetime) -> ModelResponse:
+            del request, deadline_at
+            return _response()
+
+        async def stream(self, request: ModelRequest, *, deadline_at: datetime):  # type: ignore[no-untyped-def]
+            del request, deadline_at
+            self.calls += 1
+            if self.calls == 1:
+                raise ProviderError(AgentFailureCode.PROVIDER_SERVER)
+            yield ModelStreamEvent(sequence=1, type=ModelStreamEventType.COMPLETED, response=_response())
+
+    waits: list[float] = []
+
+    async def sleep(value: float) -> None:
+        waits.append(value)
+
+    upstream = FlakyStreamingClient()
+    client = ResilientModelClient(
+        upstream,
+        max_concurrency=1,
+        retry_policy=RetryPolicy(max_attempts=2, base_delay_seconds=0.2),
+        now=lambda: NOW,
+        sleep=sleep,
+        random=lambda: 0.0,
+    )
+
+    async def scenario() -> tuple[ModelStreamEvent, ...]:
+        return tuple([event async for event in client.stream(_request(), deadline_at=NOW + timedelta(seconds=5))])
+
+    events = asyncio.run(scenario())
+
+    assert upstream.calls == 2
+    assert waits == [0.1]
+    assert tuple(event.type for event in events) == (ModelStreamEventType.COMPLETED,)
+
+
+def test_stream_does_not_retry_after_first_event() -> None:
+    class PartiallyFailingStreamingClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete(self, request: ModelRequest, *, deadline_at: datetime) -> ModelResponse:
+            del request, deadline_at
+            return _response()
+
+        async def stream(self, request: ModelRequest, *, deadline_at: datetime):  # type: ignore[no-untyped-def]
+            del request, deadline_at
+            self.calls += 1
+            yield ModelStreamEvent(sequence=1, type=ModelStreamEventType.TEXT_DELTA, text_delta="partial")
+            raise ProviderError(AgentFailureCode.PROVIDER_SERVER)
+
+    upstream = PartiallyFailingStreamingClient()
+    client = ResilientModelClient(upstream, max_concurrency=1, now=lambda: NOW)
+
+    async def scenario() -> tuple[str, AgentFailureCode]:
+        iterator = client.stream(_request(), deadline_at=NOW + timedelta(seconds=5))
+        first = await anext(iterator)
+        with pytest.raises(ProviderError) as error:
+            await anext(iterator)
+        return first.text_delta or "", error.value.code
+
+    text, code = asyncio.run(scenario())
+
+    assert text == "partial"
+    assert code is AgentFailureCode.PROVIDER_SERVER
+    assert upstream.calls == 1
+
+
 def test_stream_cancellation_releases_half_open_circuit_lease() -> None:
     clock = [0.0]
     breaker = CircuitBreaker(CircuitBreakerPolicy(failure_threshold=1, recovery_seconds=1), clock=lambda: clock[0])

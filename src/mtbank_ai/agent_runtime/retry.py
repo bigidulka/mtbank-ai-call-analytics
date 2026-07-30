@@ -152,33 +152,53 @@ class ResilientModelClient:
             await asyncio.wait_for(self._semaphore.acquire(), timeout=_remaining_seconds(deadline_at, self._now))
         except TimeoutError:
             raise AgentRuntimeError(AgentFailureCode.DEADLINE_EXCEEDED) from None
-        admitted = False
         completed_event: ModelStreamEvent | None = None
         try:
-            self._circuit_breaker.before_call()
-            admitted = True
-            async for event in stream(request, deadline_at=deadline_at):  # type: ignore[reportGeneralTypeIssues]
-                if event.type.value == "completed":
-                    completed_event = event
-                else:
-                    yield event
-            if completed_event is None:
-                raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE)
-            self._circuit_breaker.record_success()
-        except (asyncio.CancelledError, GeneratorExit):
-            if admitted:
-                self._circuit_breaker.record_aborted()
-            raise
-        except AgentRuntimeError as error:
-            if admitted and error.code is not AgentFailureCode.CIRCUIT_OPEN:
-                self._circuit_breaker.record_failure()
-            raise
-        except Exception:
-            if admitted:
-                self._circuit_breaker.record_failure()
-            raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE) from None
+            for attempt in range(self._retry_policy.max_attempts):
+                admitted = False
+                emitted = False
+                completed_event = None
+                try:
+                    self._circuit_breaker.before_call()
+                    admitted = True
+                    async for event in stream(request, deadline_at=deadline_at):  # type: ignore[reportGeneralTypeIssues]
+                        emitted = True
+                        if event.type.value == "completed":
+                            completed_event = event
+                        else:
+                            yield event
+                    if completed_event is None:
+                        raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE)
+                    self._circuit_breaker.record_success()
+                    break
+                except (asyncio.CancelledError, GeneratorExit):
+                    if admitted:
+                        self._circuit_breaker.record_aborted()
+                    raise
+                except AgentRuntimeError as error:
+                    if admitted and error.code is not AgentFailureCode.CIRCUIT_OPEN:
+                        self._circuit_breaker.record_failure()
+                    if emitted or not _is_retryable(error) or attempt + 1 >= self._retry_policy.max_attempts:
+                        raise
+                    self._circuit_breaker.before_call()
+                    self._circuit_breaker.record_aborted()
+                    self._telemetry.metrics.increment("mtbank_agent_retries_total", reason=error.code.value)
+                    delay = _retry_delay(error, attempt, self._retry_policy, self._random)
+                    if delay >= _remaining_seconds(deadline_at, self._now):
+                        raise AgentRuntimeError(AgentFailureCode.DEADLINE_EXCEEDED) from None
+                    try:
+                        await asyncio.wait_for(self._sleep(delay), timeout=_remaining_seconds(deadline_at, self._now))
+                    except TimeoutError:
+                        raise AgentRuntimeError(AgentFailureCode.DEADLINE_EXCEEDED) from None
+                except Exception:
+                    if admitted:
+                        self._circuit_breaker.record_failure()
+                    raise AgentRuntimeError(AgentFailureCode.MALFORMED_PROVIDER_RESPONSE) from None
         finally:
             self._semaphore.release()
+
+        if completed_event is None:
+            raise AssertionError("stream retry loop должен завершиться response или exception")
         yield completed_event
 
     async def complete(self, request: ModelRequest, *, deadline_at: datetime) -> ModelResponse:
