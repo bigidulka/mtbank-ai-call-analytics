@@ -724,7 +724,7 @@ class Pipeline:
         return ApiAnalysisClient(
             base_url=_require_exact_analysis_api_url(_TRUSTED_ANALYSIS_API_INTERNAL_URL),
             api_key=_require_analysis_api_key(os.getenv("MTBANK_API_KEY")),
-            timeout_seconds=self.valves.HTTP_TIMEOUT_SECONDS,
+            timeout_seconds=min(self.valves.HTTP_TIMEOUT_SECONDS, 210),
         )
 
     def _create_assistant_client(self) -> ApiAssistantClient:
@@ -739,7 +739,7 @@ class Pipeline:
             base_url=_require_exact_openwebui_internal_url(_TRUSTED_OPENWEBUI_INTERNAL_URL),
             email=_required_setting(os.getenv("WEBUI_ADMIN_EMAIL"), "WEBUI_ADMIN_EMAIL"),
             password=_required_setting(os.getenv("WEBUI_ADMIN_PASSWORD"), "WEBUI_ADMIN_PASSWORD"),
-            timeout_seconds=self.valves.HTTP_TIMEOUT_SECONDS,
+            timeout_seconds=min(self.valves.HTTP_TIMEOUT_SECONDS, 10),
         )
 
     def _validate_configuration(self) -> None:

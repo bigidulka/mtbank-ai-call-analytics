@@ -114,11 +114,35 @@ def multipart(filename: str, media_type: str, content: bytes) -> tuple[bytes, st
     return body, f"multipart/form-data; boundary={boundary}"
 
 
-def upload(token: str, scenario: Scenario) -> tuple[dict[str, Any], str]:
-    assert scenario.relative_file is not None and scenario.media_type is not None
-    path = ROOT / scenario.relative_file
+def validated_fixture(scenario: Scenario) -> tuple[Path, bytes, str]:
+    assert scenario.relative_file is not None
+    manifest = json.loads((ROOT / "test_data/manifest.yaml").read_text())
+    entries = manifest.get("entries")
+    if not isinstance(entries, list):
+        raise RuntimeError("test manifest has no entries")
+    expected_path = scenario.relative_file.removeprefix("test_data/")
+    entry = next((item for item in entries if isinstance(item, dict) and item.get("path") == expected_path), None)
+    if (
+        not isinstance(entry, dict)
+        or entry.get("kind") != "speech_reference"
+        or entry.get("license") != "LicenseRef-MTBank-Synthetic-EdgeTTS-Demo"
+        or "реальных клиентов нет" not in str(entry.get("provenance", ""))
+    ):
+        raise RuntimeError(f"{scenario.slug}: fixture provenance is not approved")
+    path = (ROOT / scenario.relative_file).resolve(strict=True)
+    synthetic_root = (ROOT / "test_data/synthetic").resolve(strict=True)
+    if not path.is_file() or not path.is_relative_to(synthetic_root):
+        raise RuntimeError(f"{scenario.slug}: fixture escapes synthetic corpus")
     content = path.read_bytes()
     digest = hashlib.sha256(content).hexdigest()
+    if digest != entry.get("sha256"):
+        raise RuntimeError(f"{scenario.slug}: fixture hash differs from approved manifest")
+    return path, content, digest
+
+
+def upload(token: str, scenario: Scenario) -> tuple[dict[str, Any], str]:
+    assert scenario.media_type is not None
+    path, content, digest = validated_fixture(scenario)
     body, content_type = multipart(path.name, scenario.media_type, content)
     uploaded = request_json(
         "/api/v1/files/?process=true",
@@ -160,10 +184,20 @@ def completion(token: str, scenario: Scenario, uploaded: dict[str, Any] | None) 
     return content
 
 
-def chat_payload(scenario: Scenario, content: str) -> dict[str, Any]:
+def attachment_descriptor(uploaded: dict[str, Any]) -> dict[str, Any]:
+    file_id = uploaded.get("id")
+    filename = uploaded.get("filename")
+    meta = uploaded.get("meta")
+    if not isinstance(file_id, str) or not isinstance(filename, str) or not isinstance(meta, dict):
+        raise RuntimeError("uploaded file descriptor is invalid")
+    return {"type": "file", "id": file_id, "file": {"id": file_id, "filename": filename, "meta": meta}}
+
+
+def chat_payload(scenario: Scenario, content: str, uploaded: dict[str, Any] | None) -> dict[str, Any]:
     user_id = uuid.uuid4().hex
     assistant_id = uuid.uuid4().hex
     timestamp = int(time.time())
+    files = [attachment_descriptor(uploaded)] if uploaded is not None else []
     return {
         "chat": {
             "id": "",
@@ -180,6 +214,7 @@ def chat_payload(scenario: Scenario, content: str) -> dict[str, Any]:
                         "content": scenario.prompt,
                         "timestamp": timestamp,
                         "models": [MODEL_ID],
+                        "files": files,
                     },
                     assistant_id: {
                         "id": assistant_id,
@@ -196,7 +231,13 @@ def chat_payload(scenario: Scenario, content: str) -> dict[str, Any]:
                 "currentId": assistant_id,
             },
             "messages": [
-                {"id": user_id, "role": "user", "content": scenario.prompt, "timestamp": timestamp},
+                {
+                    "id": user_id,
+                    "role": "user",
+                    "content": scenario.prompt,
+                    "timestamp": timestamp,
+                    "files": files,
+                },
                 {
                     "id": assistant_id,
                     "role": "assistant",
@@ -206,8 +247,9 @@ def chat_payload(scenario: Scenario, content: str) -> dict[str, Any]:
                     "done": True,
                 },
             ],
+            "files": files,
             "tags": [],
-            "timestamp": timestamp,
+            "timestamp": timestamp * 1_000,
         }
     }
 
@@ -234,10 +276,24 @@ def main() -> None:
         if scenario.relative_file is not None:
             uploaded, digest = upload(token, scenario)
         content = completion(token, scenario, uploaded)
-        created = request_json("/api/v1/chats/new", method="POST", token=token, payload=chat_payload(scenario, content))
+        created = request_json(
+            "/api/v1/chats/new",
+            method="POST",
+            token=token,
+            payload=chat_payload(scenario, content, uploaded),
+        )
         chat_id = created.get("id")
         if not isinstance(chat_id, str) or not re.fullmatch(r"[0-9a-f-]{16,64}", chat_id):
             raise RuntimeError(f"{scenario.slug}: invalid chat id")
+        saved = request_json(f"/api/v1/chats/{chat_id}", method="GET", token=token)
+        saved_chat = saved.get("chat")
+        if not isinstance(saved_chat, dict) or saved_chat.get("title") != scenario.title:
+            raise RuntimeError(f"{scenario.slug}: saved chat did not round-trip")
+        saved_files = saved_chat.get("files", [])
+        if uploaded is not None and (
+            not isinstance(saved_files, list) or not saved_files or saved_files[0].get("id") != uploaded.get("id")
+        ):
+            raise RuntimeError(f"{scenario.slug}: saved attachment did not round-trip")
         results.append(
             {
                 "slug": scenario.slug,
