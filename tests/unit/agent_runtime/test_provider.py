@@ -461,6 +461,7 @@ def test_provider_disables_sdk_retries_and_does_not_retain_api_key(monkeypatch: 
 
     assert captured["max_retries"] == 0
     assert captured["base_url"] == "https://gateway.example.test/v1"
+    assert captured["default_headers"] == {"Accept-Encoding": "identity"}
     assert "http_client" not in captured
     assert SAFE_GATEWAY_KEY not in repr(provider)
 
@@ -501,6 +502,7 @@ def test_trusted_local_provider_disables_environment_proxy_for_custom_http_clien
     assert timeout.pool == 7.0
     assert captured_http_client == {"timeout": timeout, "trust_env": False, "follow_redirects": False}
     assert captured_openai["http_client"] is http_client
+    assert captured_openai["default_headers"] == {"Accept-Encoding": "identity"}
 
 
 def test_trusted_local_provider_rejects_redirect_without_following_it(monkeypatch: pytest.MonkeyPatch) -> None:

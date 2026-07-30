@@ -70,6 +70,7 @@ class OpenAICompatibleProvider:
                 base_url=settings.base_url,
                 timeout=timeout,
                 max_retries=0,
+                default_headers={"Accept-Encoding": "identity"},
                 http_client=_trusted_local_http_client(timeout),
             )
         else:
@@ -78,6 +79,7 @@ class OpenAICompatibleProvider:
                 base_url=settings.base_url,
                 timeout=timeout,
                 max_retries=0,
+                default_headers={"Accept-Encoding": "identity"},
             )
         self._now = now
         self._monotonic = monotonic
