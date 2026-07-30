@@ -731,7 +731,7 @@ class Pipeline:
         return ApiAssistantClient(
             base_url=_require_exact_analysis_api_url(_TRUSTED_ANALYSIS_API_INTERNAL_URL),
             api_key=_require_analysis_api_key(os.getenv("MTBANK_API_KEY")),
-            timeout_seconds=min(self.valves.HTTP_TIMEOUT_SECONDS, 35),
+            timeout_seconds=min(self.valves.HTTP_TIMEOUT_SECONDS, 50),
         )
 
     def _create_file_client(self) -> FileClient:
