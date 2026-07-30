@@ -257,6 +257,9 @@ def chat_payload(scenario: Scenario, content: str, uploaded: dict[str, Any] | No
 def main() -> None:
     output = Path(os.getenv("MTBANK_DEMO_CHAT_OUTPUT", ROOT / "tmp/e2e-demo-chats/created-chats.json"))
     output.parent.mkdir(parents=True, exist_ok=True)
+    ready = request_json("/health/ready", method="GET")
+    if ready.get("status") != "ready":
+        raise RuntimeError("production readiness is not green")
     session = request_json(
         "/api/v1/auths/signin",
         method="POST",
@@ -265,9 +268,6 @@ def main() -> None:
     token = session.get("token")
     if not isinstance(token, str) or not token:
         raise RuntimeError("sign-in returned no token")
-    ready = request_json("/health/ready", method="GET")
-    if ready.get("status") != "ready":
-        raise RuntimeError("production readiness is not green")
 
     results: list[dict[str, object]] = []
     for scenario in SCENARIOS:
