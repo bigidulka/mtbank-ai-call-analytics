@@ -268,9 +268,12 @@ class DemoAssistant:
             for call, result in zip(calls, results, strict=True):
                 if result.observation is None:
                     raise AgentRuntimeError(AgentFailureCode.UNEXPECTED_RUNTIME_FAILURE)
-                if isinstance(result.output, AssistantTrendResult) and result.output.model_usage is not None:
-                    total_input_tokens += result.output.model_usage.input_tokens
-                    total_output_tokens += result.output.model_usage.output_tokens
+                if isinstance(result.output, AssistantTrendResult):
+                    if result.output.model_usage is None and result.output.cost_usd != Decimal("0"):
+                        raise AgentRuntimeError(AgentFailureCode.UNEXPECTED_RUNTIME_FAILURE)
+                    if result.output.model_usage is not None:
+                        total_input_tokens += result.output.model_usage.input_tokens
+                        total_output_tokens += result.output.model_usage.output_tokens
                     total_cost_usd += result.output.cost_usd
                     if (
                         total_input_tokens > self._runtime_settings.default_max_input_tokens
