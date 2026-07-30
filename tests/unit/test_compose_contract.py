@@ -270,7 +270,8 @@ def test_foundation_services_are_pinned_internal_and_migration_gated() -> None:
         assert "mem_limit:" in service
         assert "pids_limit:" in service
     assert '\n    expose:\n      - "8000"' in api_service
-    assert "http://127.0.0.1:8000/health/ready" in api_service
+    assert "http://127.0.0.1:8000/health/live" in api_service
+    assert "http://127.0.0.1:8000/health/ready" not in api_service
     assert _service_networks(gateway_service) == (
         "frontend",
         "gateway-ingress",

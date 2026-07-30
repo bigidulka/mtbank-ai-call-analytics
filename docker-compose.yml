@@ -372,7 +372,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health/ready', timeout=2).read()\""]
+      test: ["CMD-SHELL", "python -c \"from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health/live', timeout=2).read()\""]
       interval: 5s
       timeout: 3s
       retries: 20
