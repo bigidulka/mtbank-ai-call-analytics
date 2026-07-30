@@ -16,8 +16,10 @@
 prompt, transcript, model metadata и hidden reasoning не входят в public stream.
 Disconnect отменяет provider/tool work; partial text не сопровождается `done` после
 ошибки. OpenWebUI Pipeline проверяет event order/schema/byte-count и отдаёт deltas как
-generator. Ответ целиком валидируется и ограничивается 8000 символами до первого public
-delta; tool-protocol markers отклоняются. Trends tool допускает один reviewed-topic query
+generator. Tool-selection turns остаются private. После выбора tools runtime запускает отдельный
+no-tools final turn и выпускает его text deltas с небольшим safety holdback; terminal
+`stop`, exact final text и общий лимит 8000 символов проверяются до `done`, а
+tool-protocol markers отклоняются. Trends tool допускает один reviewed-topic query
 на assistant request и скрывает малые cohorts/точные counts. Buffered `POST /assistant`
 сохранён для compatibility.
 
