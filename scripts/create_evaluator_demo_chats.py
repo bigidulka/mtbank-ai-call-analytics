@@ -192,7 +192,12 @@ def attachment_descriptor(uploaded: dict[str, Any]) -> dict[str, Any]:
     meta = uploaded.get("meta")
     if not isinstance(file_id, str) or not isinstance(filename, str) or not isinstance(meta, dict):
         raise RuntimeError("uploaded file descriptor is invalid")
-    return {"type": "file", "id": file_id, "file": {"id": file_id, "filename": filename, "meta": meta}}
+    return {
+        "type": "file",
+        "id": file_id,
+        "name": filename,
+        "file": {"id": file_id, "name": filename, "filename": filename, "meta": meta},
+    }
 
 
 def chat_payload(scenario: Scenario, content: str, uploaded: dict[str, Any] | None) -> dict[str, Any]:
