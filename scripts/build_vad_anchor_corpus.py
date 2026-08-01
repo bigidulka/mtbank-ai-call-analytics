@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -69,16 +70,29 @@ def _anchors(audio: Path, duration: float, *, noise_db: float, minimum_silence: 
     ]
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def build(arguments: argparse.Namespace) -> dict[str, object]:
     transcriptions = json.loads(arguments.transcriptions.read_text(encoding="utf-8"))
-    raw_files = transcriptions.get("files") if isinstance(transcriptions, dict) else None
+    if not isinstance(transcriptions, dict) or transcriptions.get("status") != "completed":
+        raise ValueError("flat transcription corpus is not completed")
+    raw_files = transcriptions.get("files")
     if not isinstance(raw_files, list):
         raise ValueError("flat transcription corpus is invalid")
+    entries = tuple(
+        entry
+        for entry in validate_manifest(arguments.manifest, require_release_corpus=True)
+        if entry.kind == "speech_reference"
+    )
+    expected_ids = tuple(entry.identifier for entry in entries)
+    actual_ids = tuple(str(item.get("id")) for item in raw_files if isinstance(item, dict))
+    if actual_ids != expected_ids or len(actual_ids) != len(raw_files) or len(set(actual_ids)) != len(actual_ids):
+        raise ValueError("flat transcription corpus must exactly cover manifest entries in order")
     transcriptions_by_id = {str(item["id"]): cast(dict[str, object], item) for item in raw_files}
     files: list[dict[str, object]] = []
-    for entry in validate_manifest(arguments.manifest, require_release_corpus=True):
-        if entry.kind != "speech_reference":
-            continue
+    for entry in entries:
         transcription = transcriptions_by_id.get(entry.identifier)
         if transcription is None:
             raise ValueError(f"missing flat transcription for {entry.identifier}")
@@ -103,6 +117,12 @@ def build(arguments: argparse.Namespace) -> dict[str, object]:
         "kind": "flat-transcript-vad-anchor-corpus",
         "status": "completed",
         "scope": "approved synthetic/no-PII",
+        "provenance": {
+            "manifest_path": str(arguments.manifest),
+            "manifest_sha256": _sha256(arguments.manifest),
+            "transcriptions_path": str(arguments.transcriptions),
+            "transcriptions_sha256": _sha256(arguments.transcriptions),
+        },
         "vad": {
             "implementation": "ffmpeg silencedetect speech-complement",
             "noise_db": arguments.noise_db,
@@ -118,7 +138,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=ROOT / "test_data/manifest.yaml")
     parser.add_argument("--transcriptions", type=Path, required=True)
-    parser.add_argument("--noise-db", type=float, default=-40.0)
+    parser.add_argument("--noise-db", type=float, default=-45.0)
     parser.add_argument("--minimum-silence", type=float, default=0.25)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
