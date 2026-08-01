@@ -21,6 +21,11 @@ release-evidence/*
 !release-evidence/final-115/*.json
 !release-evidence/chatgpt-vad-luna/
 !release-evidence/chatgpt-vad-luna/*.json
+!release-evidence/external-speech-2026-08-01/
+release-evidence/external-speech-2026-08-01/*
+!release-evidence/external-speech-2026-08-01/manifest.json
+!release-evidence/external-speech-2026-08-01/summary.json
+!release-evidence/external-speech-2026-08-01/run-evaluator.py
 secrets/
 models/artifacts/
 models/*
