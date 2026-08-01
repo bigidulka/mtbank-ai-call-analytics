@@ -1,0 +1,1126 @@
+{
+  "schema_version": 1,
+  "kind": "vad-ranked-gap-loco-validation",
+  "status": "completed",
+  "provenance": {
+    "manifest_path": "/home/fsdf1234/Projects/mtbank-ai-hiring/test_data/manifest.yaml",
+    "manifest_sha256": "a520a33d5df53ccd96c2998586711bc865d644492e37d93eb0bfc6f23bc9df08",
+    "transcriptions_path": "release-evidence/chatgpt-vad-luna/chatgpt-web-transcriptions.json",
+    "transcriptions_sha256": "210824e103a42faae67deed8801658d24ac50c0a8af353c47f8806a627db9dd2",
+    "roles_path": "release-evidence/chatgpt-vad-luna/semantic-roles.json",
+    "roles_sha256": "c53c093b74405f1f6324931524e24a3d178d48cfbc9004bcc468ded3923c61ec",
+    "evaluator_path": "/home/fsdf1234/Projects/mtbank-ai-hiring/scripts/evaluate_vad_rank_loco.py",
+    "evaluator_sha256": "476a5bec37a04cd757ee24de6359e73e344422581239abffb105496fff38d318",
+    "builder_path": "/home/fsdf1234/Projects/mtbank-ai-hiring/scripts/build_vad_anchor_corpus.py",
+    "builder_sha256": "a48e2d87d2120e86203a7f8991f053f038c6246bbd991895c7c85f9b10c59905",
+    "aligner_path": "/home/fsdf1234/Projects/mtbank-ai-hiring/scripts/evaluate_vad_rank_alignment.py",
+    "aligner_sha256": "6196a554dc82a331fe65e1cbcee8fe946e613ffc9fc5e8af67ff39590366c186",
+    "metric_evaluator_path": "/home/fsdf1234/Projects/mtbank-ai-hiring/scripts/evaluate_speech.py",
+    "metric_evaluator_sha256": "9874173fbf54d398a6be55b96854a74e1e9b1f9c6201e08d6dc55ac349361ca7"
+  },
+  "grid": {
+    "noise_db": [
+      -40,
+      -45,
+      -50,
+      -55,
+      -60
+    ],
+    "speech_start_padding": [
+      0.0,
+      0.1,
+      0.2,
+      0.3
+    ],
+    "speech_end_padding": [
+      0.6,
+      0.7,
+      0.8,
+      0.9
+    ],
+    "minimum_silence_seconds": 0.25,
+    "selection_objective": "minimum mean DER on non-held-out calls",
+    "tie_break": "lower numeric noise_db, then lower start padding, then lower end padding"
+  },
+  "configurations": [
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.08148162821517949,
+        "synthetic-card-complaint-telephone": 0.08701273438093118,
+        "synthetic-transfer-question": 0.0922922817460319,
+        "synthetic-mobile-app-security": 0.09429082950052464,
+        "synthetic-deposit-consultation": 0.09643331728025184
+      },
+      "macro_der": 0.09030215822458382
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.06748230018292516,
+        "synthetic-card-complaint-telephone": 0.07183016397176027,
+        "synthetic-transfer-question": 0.07641926587301534,
+        "synthetic-mobile-app-security": 0.07815268700072567,
+        "synthetic-deposit-consultation": 0.08038023508847024
+      },
+      "macro_der": 0.07485293042337934
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.054059865793108015,
+        "synthetic-card-complaint-telephone": 0.05671638958475701,
+        "synthetic-transfer-question": 0.06104228174603196,
+        "synthetic-mobile-app-security": 0.06264116840151701,
+        "synthetic-deposit-consultation": 0.0643271528966901
+      },
+      "macro_der": 0.05975737168442082
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.045241474409228453,
+        "synthetic-card-complaint-telephone": 0.051046648447582006,
+        "synthetic-transfer-question": 0.050435892857142714,
+        "synthetic-mobile-app-security": 0.05245523682724083,
+        "synthetic-deposit-consultation": 0.04923392016267102
+      },
+      "macro_der": 0.049682634540773
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.06748230018292559,
+        "synthetic-card-complaint-telephone": 0.07183016397176123,
+        "synthetic-transfer-question": 0.07641926587301634,
+        "synthetic-mobile-app-security": 0.0781526870007267,
+        "synthetic-deposit-consultation": 0.08038023508847139
+      },
+      "macro_der": 0.07485293042338023
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.05348297215067125,
+        "synthetic-card-complaint-telephone": 0.05664759356259029,
+        "synthetic-transfer-question": 0.06054624999999979,
+        "synthetic-mobile-app-security": 0.062014544500927714,
+        "synthetic-deposit-consultation": 0.0643271528966898
+      },
+      "macro_der": 0.05940370262217577
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.04006053776085411,
+        "synthetic-card-complaint-telephone": 0.04153381917558704,
+        "synthetic-transfer-question": 0.0451692658730164,
+        "synthetic-mobile-app-security": 0.04650302590171905,
+        "synthetic-deposit-consultation": 0.04827407070490967
+      },
+      "macro_der": 0.04430814388321725
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03124214637697456,
+        "synthetic-card-complaint-telephone": 0.03586407803841204,
+        "synthetic-transfer-question": 0.034562876984127154,
+        "synthetic-mobile-app-security": 0.03631709432744288,
+        "synthetic-deposit-consultation": 0.03318083797089059
+      },
+      "macro_der": 0.03423340673956944
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.053482972150671194,
+        "synthetic-card-complaint-telephone": 0.056647593562590366,
+        "synthetic-transfer-question": 0.06054624999999986,
+        "synthetic-mobile-app-security": 0.062014544500927804,
+        "synthetic-deposit-consultation": 0.06432715289668989
+      },
+      "macro_der": 0.05940370262217583
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03948364411841686,
+        "synthetic-card-complaint-telephone": 0.04146502315341944,
+        "synthetic-transfer-question": 0.04467323412698329,
+        "synthetic-mobile-app-security": 0.04587640200112882,
+        "synthetic-deposit-consultation": 0.04827407070490829
+      },
+      "macro_der": 0.04395447482097135
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.026061209728599717,
+        "synthetic-card-complaint-telephone": 0.026351248766416188,
+        "synthetic-transfer-question": 0.029296249999999913,
+        "synthetic-mobile-app-security": 0.03036488340192016,
+        "synthetic-deposit-consultation": 0.03222098851312814
+      },
+      "macro_der": 0.028858916082012825
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.017242818344720166,
+        "synthetic-card-complaint-telephone": 0.020681507629241185,
+        "synthetic-transfer-question": 0.01868986111111067,
+        "synthetic-mobile-app-security": 0.02017895182764399,
+        "synthetic-deposit-consultation": 0.01712775577910907
+      },
+      "macro_der": 0.018784178938365016
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.05416191156157954,
+        "synthetic-card-complaint-telephone": 0.05697259546041164,
+        "synthetic-transfer-question": 0.061017460317460234,
+        "synthetic-mobile-app-security": 0.06231592431211216,
+        "synthetic-deposit-consultation": 0.06561694670376722
+      },
+      "macro_der": 0.060016967671066165
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.0401625835293252,
+        "synthetic-card-complaint-telephone": 0.04179002505124071,
+        "synthetic-transfer-question": 0.045144444444443675,
+        "synthetic-mobile-app-security": 0.046177781812313176,
+        "synthetic-deposit-consultation": 0.04956386451198563
+      },
+      "macro_der": 0.04456773986986168
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.02674014913950807,
+        "synthetic-card-complaint-telephone": 0.02667625066423746,
+        "synthetic-transfer-question": 0.029767460317460293,
+        "synthetic-mobile-app-security": 0.030666263213104512,
+        "synthetic-deposit-consultation": 0.03351078232020548
+      },
+      "macro_der": 0.029472181130903163
+    },
+    {
+      "noise_db": -40,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.017921757755628518,
+        "synthetic-card-complaint-telephone": 0.021006509527062452,
+        "synthetic-transfer-question": 0.019161071428571052,
+        "synthetic-mobile-app-security": 0.020480331638828342,
+        "synthetic-deposit-consultation": 0.01841754958618641
+      },
+      "macro_der": 0.019397443987255354
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.07545726005151848,
+        "synthetic-card-complaint-telephone": 0.08147465459652359,
+        "synthetic-transfer-question": 0.08784662698412725,
+        "synthetic-mobile-app-security": 0.08767611756636844,
+        "synthetic-deposit-consultation": 0.08843634061073108
+      },
+      "macro_der": 0.08417819996185377
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.06145793201926415,
+        "synthetic-card-complaint-telephone": 0.06629208418735263,
+        "synthetic-transfer-question": 0.07197361111111067,
+        "synthetic-mobile-app-security": 0.07153797506656943,
+        "synthetic-deposit-consultation": 0.07238325841894949
+      },
+      "macro_der": 0.06872897216064928
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.04832015063276934,
+        "synthetic-card-complaint-telephone": 0.05221736696272681,
+        "synthetic-transfer-question": 0.05702942460317466,
+        "synthetic-mobile-app-security": 0.05668836238198971,
+        "synthetic-deposit-consultation": 0.0563402183219182
+      },
+      "macro_der": 0.05411910458051574
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.04165473457274078,
+        "synthetic-card-complaint-telephone": 0.04772190275563626,
+        "synthetic-transfer-question": 0.0501928571428567,
+        "synthetic-mobile-app-security": 0.0519326736867582,
+        "synthetic-deposit-consultation": 0.04580206549657517
+      },
+      "macro_der": 0.04746084673091342
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.06145793201926459,
+        "synthetic-card-complaint-telephone": 0.06629208418735362,
+        "synthetic-transfer-question": 0.07197361111111168,
+        "synthetic-mobile-app-security": 0.07153797506657046,
+        "synthetic-deposit-consultation": 0.07238325841895064
+      },
+      "macro_der": 0.0687289721606502
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.04745860398701025,
+        "synthetic-card-complaint-telephone": 0.05110951377818267,
+        "synthetic-transfer-question": 0.0561005952380951,
+        "synthetic-mobile-app-security": 0.05539983256677148,
+        "synthetic-deposit-consultation": 0.05633017622716905
+      },
+      "macro_der": 0.05327974435944571
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.034320822600515444,
+        "synthetic-card-complaint-telephone": 0.03703479655355685,
+        "synthetic-transfer-question": 0.0411564087301591,
+        "synthetic-mobile-app-security": 0.04055021988219176,
+        "synthetic-deposit-consultation": 0.040287136130137756
+      },
+      "macro_der": 0.03866987677931218
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.027655406540486878,
+        "synthetic-card-complaint-telephone": 0.03253933234646629,
+        "synthetic-transfer-question": 0.03431984126984113,
+        "synthetic-mobile-app-security": 0.03579453118696024,
+        "synthetic-deposit-consultation": 0.02974898330479474
+      },
+      "macro_der": 0.03201161892970986
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.04872670045171297,
+        "synthetic-card-complaint-telephone": 0.05225057883549702,
+        "synthetic-transfer-question": 0.05643293650793651,
+        "synthetic-mobile-app-security": 0.05714099693375301,
+        "synthetic-deposit-consultation": 0.05799231235730597
+      },
+      "macro_der": 0.0545087050172411
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03472737241945863,
+        "synthetic-card-complaint-telephone": 0.03706800842632608,
+        "synthetic-transfer-question": 0.04055992063491993,
+        "synthetic-mobile-app-security": 0.041002854433954024,
+        "synthetic-deposit-consultation": 0.04193923016552438
+      },
+      "macro_der": 0.03905947721603661
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.02158959103296382,
+        "synthetic-card-complaint-telephone": 0.022993291201700253,
+        "synthetic-transfer-question": 0.02561573412698392,
+        "synthetic-mobile-app-security": 0.026153241749374303,
+        "synthetic-deposit-consultation": 0.025896190068493086
+      },
+      "macro_der": 0.024449609635903077
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.014924174972935253,
+        "synthetic-card-complaint-telephone": 0.01849782699460969,
+        "synthetic-transfer-question": 0.01877916666666596,
+        "synthetic-mobile-app-security": 0.021397553054142787,
+        "synthetic-deposit-consultation": 0.015358037243150068
+      },
+      "macro_der": 0.01779135178630075
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.052113921865084574,
+        "synthetic-card-complaint-telephone": 0.05518034046914157,
+        "synthetic-transfer-question": 0.05863279761904767,
+        "synthetic-mobile-app-security": 0.060008018639554676,
+        "synthetic-deposit-consultation": 0.06302893122146118
+      },
+      "macro_der": 0.05779280196285793
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03811459383283023,
+        "synthetic-card-complaint-telephone": 0.03999777005997063,
+        "synthetic-transfer-question": 0.0427597817460311,
+        "synthetic-mobile-app-security": 0.04386987613975569,
+        "synthetic-deposit-consultation": 0.04697584902967959
+      },
+      "macro_der": 0.04234357416165344
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.02497681244633542,
+        "synthetic-card-complaint-telephone": 0.025923052835344806,
+        "synthetic-transfer-question": 0.027815595238095087,
+        "synthetic-mobile-app-security": 0.029020263455175964,
+        "synthetic-deposit-consultation": 0.030932808932648298
+      },
+      "macro_der": 0.027733706581519912
+    },
+    {
+      "noise_db": -45,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.018311396386306855,
+        "synthetic-card-complaint-telephone": 0.021427588628254248,
+        "synthetic-transfer-question": 0.020979027777777125,
+        "synthetic-mobile-app-security": 0.024264574759944448,
+        "synthetic-deposit-consultation": 0.02039465610730528
+      },
+      "macro_der": 0.02107544873191759
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.06485305838653138,
+        "synthetic-card-complaint-telephone": 0.07346347642906012,
+        "synthetic-transfer-question": 0.07859558531746053,
+        "synthetic-mobile-app-security": 0.07563302872589414,
+        "synthetic-deposit-consultation": 0.07710496040239762
+      },
+      "macro_der": 0.07393002185226875
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.05085373035427705,
+        "synthetic-card-complaint-telephone": 0.05828090601988918,
+        "synthetic-transfer-question": 0.06272256944444395,
+        "synthetic-mobile-app-security": 0.059494886226095174,
+        "synthetic-deposit-consultation": 0.06105187821061602
+      },
+      "macro_der": 0.05848079405106428
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03828875480643547,
+        "synthetic-card-complaint-telephone": 0.04474706786609007,
+        "synthetic-transfer-question": 0.04821985119047633,
+        "synthetic-mobile-app-security": 0.046975238037601966,
+        "synthetic-deposit-consultation": 0.04503223994006872
+      },
+      "macro_der": 0.044652630368134515
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03291184623138139,
+        "synthetic-card-complaint-telephone": 0.04122423707583664,
+        "synthetic-transfer-question": 0.04291725198412683,
+        "synthetic-mobile-app-security": 0.045186183732752246,
+        "synthetic-deposit-consultation": 0.03686302261700911
+      },
+      "macro_der": 0.03982050832822124
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.05085373035427748,
+        "synthetic-card-complaint-telephone": 0.05828090601989015,
+        "synthetic-transfer-question": 0.06272256944444496,
+        "synthetic-mobile-app-security": 0.059494886226096194,
+        "synthetic-deposit-consultation": 0.06105187821061717
+      },
+      "macro_der": 0.05848079405106519
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03685440232202315,
+        "synthetic-card-complaint-telephone": 0.04309833561071922,
+        "synthetic-transfer-question": 0.04684955357142839,
+        "synthetic-mobile-app-security": 0.04335674372629721,
+        "synthetic-deposit-consultation": 0.044998796018835586
+      },
+      "macro_der": 0.043031566249860716
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.02428942677418157,
+        "synthetic-card-complaint-telephone": 0.0295644974569201,
+        "synthetic-transfer-question": 0.03234683531746077,
+        "synthetic-mobile-app-security": 0.03083709553780401,
+        "synthetic-deposit-consultation": 0.028979157748288287
+      },
+      "macro_der": 0.029203402566930946
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.018912518199127492,
+        "synthetic-card-complaint-telephone": 0.026041666666666668,
+        "synthetic-transfer-question": 0.027044236111111272,
+        "synthetic-mobile-app-security": 0.029048041232954288,
+        "synthetic-deposit-consultation": 0.02080994042522868
+      },
+      "macro_der": 0.02437128052701768
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.04720808134542891,
+        "synthetic-card-complaint-telephone": 0.051304040461550925,
+        "synthetic-transfer-question": 0.05401100198412709,
+        "synthetic-mobile-app-security": 0.052081427015251335,
+        "synthetic-deposit-consultation": 0.05624374821632473
+      },
+      "macro_der": 0.0521696598045366
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03320875331317457,
+        "synthetic-card-complaint-telephone": 0.036121470052379985,
+        "synthetic-transfer-question": 0.03813798611111051,
+        "synthetic-mobile-app-security": 0.03594328451545236,
+        "synthetic-deposit-consultation": 0.04019066602454313
+      },
+      "macro_der": 0.03672043200333211
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.02064377776533299,
+        "synthetic-card-complaint-telephone": 0.022587631898580873,
+        "synthetic-transfer-question": 0.02363526785714289,
+        "synthetic-mobile-app-security": 0.023423636326959152,
+        "synthetic-deposit-consultation": 0.024171027753995836
+      },
+      "macro_der": 0.022892268320402347
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.015266869190278915,
+        "synthetic-card-complaint-telephone": 0.019064801108327437,
+        "synthetic-transfer-question": 0.01833266865079339,
+        "synthetic-mobile-app-security": 0.02163458202210943,
+        "synthetic-deposit-consultation": 0.01600181043093623
+      },
+      "macro_der": 0.018060146280489082
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.05907600235188797,
+        "synthetic-card-complaint-telephone": 0.06061522622029963,
+        "synthetic-transfer-question": 0.06329673611111088,
+        "synthetic-mobile-app-security": 0.06257370087952895,
+        "synthetic-deposit-consultation": 0.06865702589897252
+      },
+      "macro_der": 0.06284373829235998
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.04507667431963365,
+        "synthetic-card-complaint-telephone": 0.04543265581112868,
+        "synthetic-transfer-question": 0.047423720238094304,
+        "synthetic-mobile-app-security": 0.04643555837972998,
+        "synthetic-deposit-consultation": 0.05260394370719092
+      },
+      "macro_der": 0.047394510491155506
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03251169877179206,
+        "synthetic-card-complaint-telephone": 0.03189881765732957,
+        "synthetic-transfer-question": 0.03292100198412668,
+        "synthetic-mobile-app-security": 0.03391591019123677,
+        "synthetic-deposit-consultation": 0.036584305436643615
+      },
+      "macro_der": 0.03356634680822574
+    },
+    {
+      "noise_db": -50,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.027134790196737982,
+        "synthetic-card-complaint-telephone": 0.02837598686707614,
+        "synthetic-transfer-question": 0.027618402777777187,
+        "synthetic-mobile-app-security": 0.03212685588638705,
+        "synthetic-deposit-consultation": 0.028415088113584015
+      },
+      "macro_der": 0.028734224768312472
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.052100230522268795,
+        "synthetic-card-complaint-telephone": 0.056773324223791714,
+        "synthetic-transfer-question": 0.05910156746031752,
+        "synthetic-mobile-app-security": 0.0625359376260795,
+        "synthetic-deposit-consultation": 0.0611873305507995
+      },
+      "macro_der": 0.0583396780766514
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03810090249001446,
+        "synthetic-card-complaint-telephone": 0.04159075381462079,
+        "synthetic-transfer-question": 0.04322855158730094,
+        "synthetic-mobile-app-security": 0.046397795126280506,
+        "synthetic-deposit-consultation": 0.04513424835901791
+      },
+      "macro_der": 0.042890450275446926
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.033972276664053676,
+        "synthetic-card-complaint-telephone": 0.036827222348743915,
+        "synthetic-transfer-question": 0.038151686507936225,
+        "synthetic-mobile-app-security": 0.03938902001129643,
+        "synthetic-deposit-consultation": 0.03824146511130122
+      },
+      "macro_der": 0.03731633412866629
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03791485142046588,
+        "synthetic-card-complaint-telephone": 0.042665395126394855,
+        "synthetic-transfer-question": 0.04336992063492066,
+        "synthetic-mobile-app-security": 0.043784142257726116,
+        "synthetic-deposit-consultation": 0.04114439747431516
+      },
+      "macro_der": 0.041775741382764534
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.0381009024900149,
+        "synthetic-card-complaint-telephone": 0.04159075381462175,
+        "synthetic-transfer-question": 0.04322855158730196,
+        "synthetic-mobile-app-security": 0.046397795126281546,
+        "synthetic-deposit-consultation": 0.045134248359019066
+      },
+      "macro_der": 0.04289045027544784
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.02410157445776056,
+        "synthetic-card-complaint-telephone": 0.026408183405450824,
+        "synthetic-transfer-question": 0.027355535714285388,
+        "synthetic-mobile-app-security": 0.03025965262648256,
+        "synthetic-deposit-consultation": 0.029081166167237472
+      },
+      "macro_der": 0.02744122247424336
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.019972948631799783,
+        "synthetic-card-complaint-telephone": 0.021644651939573947,
+        "synthetic-transfer-question": 0.022278670634920672,
+        "synthetic-mobile-app-security": 0.023250877511498482,
+        "synthetic-deposit-consultation": 0.022188382919520785
+      },
+      "macro_der": 0.021867106327462735
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.023915523388211984,
+        "synthetic-card-complaint-telephone": 0.02748282471722489,
+        "synthetic-transfer-question": 0.027496904761905104,
+        "synthetic-mobile-app-security": 0.02764599975792817,
+        "synthetic-deposit-consultation": 0.025091315282534728
+      },
+      "macro_der": 0.026326513581560972
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03751177343487487,
+        "synthetic-card-complaint-telephone": 0.04105936385030064,
+        "synthetic-transfer-question": 0.04333765873015936,
+        "synthetic-mobile-app-security": 0.045827916969257726,
+        "synthetic-deposit-consultation": 0.044793084688927585
+      },
+      "macro_der": 0.042505959534704034
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.023512445402620524,
+        "synthetic-card-complaint-telephone": 0.025876793441129704,
+        "synthetic-transfer-question": 0.02746464285714278,
+        "synthetic-mobile-app-security": 0.02968977446945874,
+        "synthetic-deposit-consultation": 0.02874000249714599
+      },
+      "macro_der": 0.02705673173349955
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.019383819576659748,
+        "synthetic-card-complaint-telephone": 0.021113261975252828,
+        "synthetic-transfer-question": 0.022387777777778065,
+        "synthetic-mobile-app-security": 0.022680999354474665,
+        "synthetic-deposit-consultation": 0.021847219249429305
+      },
+      "macro_der": 0.021482615586718923
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.023326394333071952,
+        "synthetic-card-complaint-telephone": 0.02695143475290377,
+        "synthetic-transfer-question": 0.027606011904762494,
+        "synthetic-mobile-app-security": 0.02707612160090435,
+        "synthetic-deposit-consultation": 0.024750151612443247
+      },
+      "macro_der": 0.025942022840817165
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.05127252491880454,
+        "synthetic-card-complaint-telephone": 0.05624193425947034,
+        "synthetic-transfer-question": 0.059210674603174654,
+        "synthetic-mobile-app-security": 0.06196605946905541,
+        "synthetic-deposit-consultation": 0.06084616688070778
+      },
+      "macro_der": 0.057907472026242544
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.037273196886550196,
+        "synthetic-card-complaint-telephone": 0.041059363850299416,
+        "synthetic-transfer-question": 0.043337658730158074,
+        "synthetic-mobile-app-security": 0.04582791696925642,
+        "synthetic-deposit-consultation": 0.044793084688926184
+      },
+      "macro_der": 0.04245824422503806
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03314457106058942,
+        "synthetic-card-complaint-telephone": 0.03629583238442254,
+        "synthetic-transfer-question": 0.03826079365079336,
+        "synthetic-mobile-app-security": 0.03881914185427235,
+        "synthetic-deposit-consultation": 0.0379003014412095
+      },
+      "macro_der": 0.03688412807825743
+    },
+    {
+      "noise_db": -55,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.037087145817001614,
+        "synthetic-card-complaint-telephone": 0.04213400516207348,
+        "synthetic-transfer-question": 0.04347902777777779,
+        "synthetic-mobile-app-security": 0.04321426410070203,
+        "synthetic-deposit-consultation": 0.04080323380422344
+      },
+      "macro_der": 0.04134353533235567
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.05052443349385935,
+        "synthetic-card-complaint-telephone": 0.052636073787292445,
+        "synthetic-transfer-question": 0.055425972222222425,
+        "synthetic-mobile-app-security": 0.05602269426289071,
+        "synthetic-deposit-consultation": 0.05572650007134765
+      },
+      "macro_der": 0.05406713476752252
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03652510546160501,
+        "synthetic-card-complaint-telephone": 0.037453503378121505,
+        "synthetic-transfer-question": 0.039552956349205866,
+        "synthetic-mobile-app-security": 0.03988455176309172,
+        "synthetic-deposit-consultation": 0.03967341787956606
+      },
+      "macro_der": 0.038617906966318026
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.032702710269906766,
+        "synthetic-card-complaint-telephone": 0.03460439914977596,
+        "synthetic-transfer-question": 0.0366263690476189,
+        "synthetic-mobile-app-security": 0.03655101670297694,
+        "synthetic-deposit-consultation": 0.03602134168093576
+      },
+      "macro_der": 0.03530116737024287
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.0,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03685117781013225,
+        "synthetic-card-complaint-telephone": 0.04264404463675725,
+        "synthetic-transfer-question": 0.04399742063492095,
+        "synthetic-mobile-app-security": 0.045027333978858886,
+        "synthetic-deposit-consultation": 0.04273129815924676
+      },
+      "macro_der": 0.04225025504398322
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03652510546160546,
+        "synthetic-card-complaint-telephone": 0.03745350337812247,
+        "synthetic-transfer-question": 0.03955295634920687,
+        "synthetic-mobile-app-security": 0.03988455176309275,
+        "synthetic-deposit-consultation": 0.03967341787956722
+      },
+      "macro_der": 0.038617906966318956
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.022525777429351114,
+        "synthetic-card-complaint-telephone": 0.022270932968951534,
+        "synthetic-transfer-question": 0.023679940476190306,
+        "synthetic-mobile-app-security": 0.023746409263293765,
+        "synthetic-deposit-consultation": 0.023620335687785626
+      },
+      "macro_der": 0.02316867916511447
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.018703382237652878,
+        "synthetic-card-complaint-telephone": 0.019421828740605995,
+        "synthetic-transfer-question": 0.020753353174603337,
+        "synthetic-mobile-app-security": 0.020412874203178985,
+        "synthetic-deposit-consultation": 0.01996825948915532
+      },
+      "macro_der": 0.0198519395690393
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.1,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.02285184977787836,
+        "synthetic-card-complaint-telephone": 0.02746147422758728,
+        "synthetic-transfer-question": 0.028124404761905395,
+        "synthetic-mobile-app-security": 0.028889191479060924,
+        "synthetic-deposit-consultation": 0.026678215967466334
+      },
+      "macro_der": 0.026801027242779656
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.036977190428192856,
+        "synthetic-card-complaint-telephone": 0.03827668336749457,
+        "synthetic-transfer-question": 0.04064420634920673,
+        "synthetic-mobile-app-security": 0.04089943919954883,
+        "synthetic-deposit-consultation": 0.04078598565924719
+      },
+      "macro_der": 0.039516701000738036
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.022977862395938513,
+        "synthetic-card-complaint-telephone": 0.023094112958323632,
+        "synthetic-transfer-question": 0.02477119047619017,
+        "synthetic-mobile-app-security": 0.024761296699749854,
+        "synthetic-deposit-consultation": 0.024732903467465598
+      },
+      "macro_der": 0.024067473199533555
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.019155467204240273,
+        "synthetic-card-complaint-telephone": 0.020245008729978094,
+        "synthetic-transfer-question": 0.021844603174603204,
+        "synthetic-mobile-app-security": 0.02142776163963507,
+        "synthetic-deposit-consultation": 0.02108082726883529
+      },
+      "macro_der": 0.020750733603458388
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.2,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.02330393474446576,
+        "synthetic-card-complaint-telephone": 0.028284654216959377,
+        "synthetic-transfer-question": 0.02921565476190526,
+        "synthetic-mobile-app-security": 0.029904078915517013,
+        "synthetic-deposit-consultation": 0.027790783747146303
+      },
+      "macro_der": 0.027699821277198743
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.6,
+      "file_der": {
+        "synthetic-credit-consultation": 0.050854612311943465,
+        "synthetic-card-complaint-telephone": 0.05345925377666429,
+        "synthetic-transfer-question": 0.05651722222222203,
+        "synthetic-mobile-app-security": 0.05703758169934652,
+        "synthetic-deposit-consultation": 0.05683906785102739
+      },
+      "macro_der": 0.05494154757224075
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.7,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03685528427968912,
+        "synthetic-card-complaint-telephone": 0.03827668336749335,
+        "synthetic-transfer-question": 0.040644206349205465,
+        "synthetic-mobile-app-security": 0.04089943919954754,
+        "synthetic-deposit-consultation": 0.040785985659245794
+      },
+      "macro_der": 0.039492319771036254
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.8,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03303288908799089,
+        "synthetic-card-complaint-telephone": 0.03542757913914781,
+        "synthetic-transfer-question": 0.0377176190476185,
+        "synthetic-mobile-app-security": 0.03756590413943276,
+        "synthetic-deposit-consultation": 0.03713390946061549
+      },
+      "macro_der": 0.036175580174961086
+    },
+    {
+      "noise_db": -60,
+      "speech_start_padding": 0.3,
+      "speech_end_padding": 0.9,
+      "file_der": {
+        "synthetic-credit-consultation": 0.03718135662821637,
+        "synthetic-card-complaint-telephone": 0.04346722462612909,
+        "synthetic-transfer-question": 0.04508867063492056,
+        "synthetic-mobile-app-security": 0.0460422214153147,
+        "synthetic-deposit-consultation": 0.0438438659389265
+      },
+      "macro_der": 0.04312466784870144
+    }
+  ],
+  "folds": [
+    {
+      "held_out_id": "synthetic-credit-consultation",
+      "selected_noise_db": -45,
+      "selected_speech_start_padding": 0.2,
+      "selected_speech_end_padding": 0.9,
+      "held_out_der": 0.014924174972935253
+    },
+    {
+      "held_out_id": "synthetic-card-complaint-telephone",
+      "selected_noise_db": -45,
+      "selected_speech_start_padding": 0.2,
+      "selected_speech_end_padding": 0.9,
+      "held_out_der": 0.01849782699460969
+    },
+    {
+      "held_out_id": "synthetic-transfer-question",
+      "selected_noise_db": -45,
+      "selected_speech_start_padding": 0.2,
+      "selected_speech_end_padding": 0.9,
+      "held_out_der": 0.01877916666666596
+    },
+    {
+      "held_out_id": "synthetic-mobile-app-security",
+      "selected_noise_db": -45,
+      "selected_speech_start_padding": 0.2,
+      "selected_speech_end_padding": 0.9,
+      "held_out_der": 0.021397553054142787
+    },
+    {
+      "held_out_id": "synthetic-deposit-consultation",
+      "selected_noise_db": -45,
+      "selected_speech_start_padding": 0.2,
+      "selected_speech_end_padding": 0.9,
+      "held_out_der": 0.015358037243150068
+    }
+  ],
+  "macro_held_out_der": 0.01779135178630075,
+  "claim_boundary": "folds share one fixed-pause authored TTS generator and are not independent natural-call evidence"
+}

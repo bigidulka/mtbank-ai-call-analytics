@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "kind": "speech-profile-comparison",
+  "status": "completed",
+  "scope": "authored synthetic/no-PII corpus only",
+  "manifest_sha256": "a520a33d5df53ccd96c2998586711bc865d644492e37d93eb0bfc6f23bc9df08",
+  "ordered_file_ids": [
+    "synthetic-credit-consultation",
+    "synthetic-card-complaint-telephone",
+    "synthetic-transfer-question",
+    "synthetic-mobile-app-security",
+    "synthetic-deposit-consultation"
+  ],
+  "evidence": {
+    "candidate": {
+      "path": "release-evidence/chatgpt-vad-luna/candidate-evaluation.json",
+      "sha256": "6ceb709f2dc524693db5b79a1eb1a10566bb06b927a4a05ad3d6715e075121a2",
+      "provenance": {
+        "manifest_path": "/home/fsdf1234/Projects/mtbank-ai-hiring/test_data/manifest.yaml",
+        "manifest_sha256": "a520a33d5df53ccd96c2998586711bc865d644492e37d93eb0bfc6f23bc9df08",
+        "vad_corpus_path": "release-evidence/chatgpt-vad-luna/vad-corpus.json",
+        "vad_corpus_sha256": "4a5e84dde2e1e6f1074ac1be3f1d2ff39aae7e8bb641d13ac940e5456af2c2cc",
+        "roles_path": "release-evidence/chatgpt-vad-luna/semantic-roles.json",
+        "roles_sha256": "c53c093b74405f1f6324931524e24a3d178d48cfbc9004bcc468ded3923c61ec",
+        "evaluator_path": "/home/fsdf1234/Projects/mtbank-ai-hiring/scripts/evaluate_vad_rank_alignment.py",
+        "evaluator_sha256": "6196a554dc82a331fe65e1cbcee8fe946e613ffc9fc5e8af67ff39590366c186",
+        "metric_evaluator_path": "/home/fsdf1234/Projects/mtbank-ai-hiring/scripts/evaluate_speech.py",
+        "metric_evaluator_sha256": "9874173fbf54d398a6be55b96854a74e1e9b1f9c6201e08d6dc55ac349361ca7"
+      }
+    },
+    "canonical": {
+      "path": "/home/fsdf1234/Projects/mtbank-ai-hiring/release-evidence/final-115/canonical-speech-evaluation.json",
+      "sha256": "a1b609db39548dccae4713c1261148b33d215eb79e2f7ac2ee7f9a1b25957837"
+    }
+  },
+  "candidate": {
+    "wer": {
+      "wer": 0.026061776061776062,
+      "substitutions": 25,
+      "deletions": 0,
+      "insertions": 2,
+      "reference_words": 1036
+    },
+    "der": {
+      "der": 0.01722829686332591,
+      "miss_seconds": 7.552007999999839,
+      "false_alarm_seconds": 3.332003000000034,
+      "confusion_seconds": 0.0,
+      "reference_speaker_seconds": 631.7520000000001
+    },
+    "time_weighted_role_accuracy": 0.9880459294153404,
+    "speaker_attributed_wer": 0.03185328185328185
+  },
+  "canonical": {
+    "wer": {
+      "wer": 0.07335907335907337,
+      "substitutions": 31,
+      "deletions": 13,
+      "insertions": 32,
+      "reference_words": 1036
+    },
+    "der": {
+      "der": 0.20303853410832087,
+      "miss_seconds": 93.53999999999992,
+      "false_alarm_seconds": 27.00599999999998,
+      "confusion_seconds": 7.724000000000018,
+      "reference_speaker_seconds": 631.752
+    },
+    "time_weighted_role_accuracy": 0.839709252998012,
+    "speaker_attributed_wer": {
+      "wer": 0.07335907335907337,
+      "substitutions": 31,
+      "deletions": 13,
+      "insertions": 32,
+      "reference_words": 1036
+    }
+  },
+  "claim_boundary": "Comparable corpus hashes and shared metric functions; candidate exploits authored fixed-pause TTS structure and has no independent natural-call evidence"
+}

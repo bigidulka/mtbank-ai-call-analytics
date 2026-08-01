@@ -19,6 +19,8 @@ release-evidence/
 release-evidence/*
 !release-evidence/final-115/
 !release-evidence/final-115/*.json
+!release-evidence/chatgpt-vad-luna/
+!release-evidence/chatgpt-vad-luna/*.json
 secrets/
 models/artifacts/
 models/*

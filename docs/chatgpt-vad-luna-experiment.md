@@ -25,13 +25,19 @@ Direct `VAD anchors + Luna alignment` and proportional word-time alignment were 
 
 ## Same-corpus result
 
-Evidence links identical ordered audio SHA-256 values and current manifest SHA-256 to canonical RunPod evidence through `scripts/compare_speech_profiles.py`. Both paths use metric functions from `scripts/evaluate_speech.py`. Generated local artifacts:
+Evidence links identical ordered audio SHA-256 values and current manifest SHA-256 to canonical RunPod evidence through `scripts/compare_speech_profiles.py`. Both paths use metric functions from `scripts/evaluate_speech.py`. Preserved evidence is under `release-evidence/chatgpt-vad-luna/`:
 
-- `tmp/chatgpt-vad-rank-final.json` — candidate segments/metrics/provenance;
-- `tmp/chatgpt-vad-rank-final-boundaries.json` — boundary metrics/provenance;
-- `tmp/chatgpt-vad-rank-loco.json` — full LOCO grid and fold selections;
-- `tmp/chatgpt-vad-vs-runpod.json` — hash-linked same-corpus comparison;
-- `tmp/chatgpt-vad-luna-final-summary.json` — hashes of those artifacts.
+- `candidate-evaluation.json` — candidate segments/metrics/provenance;
+- `boundary-evaluation.json` — boundary metrics/provenance;
+- `loco-validation.json` — full LOCO grid and fold selections;
+- `runpod-comparison.json` — hash-linked same-corpus comparison;
+- `manifest.json` — SHA-256 and byte count for preserved inputs/results.
+
+Rerun from project root:
+
+```bash
+PYTHONHASHSEED=0 bash scripts/verify_chatgpt_vad_luna_evidence.sh
+```
 
 Five approved synthetic/no-PII files, 714.802 seconds:
 

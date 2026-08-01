@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "kind": "chatgpt-vad-luna-evidence-manifest",
+  "scope": "authored synthetic/no-PII corpus only",
+  "files": [
+    {
+      "path": "boundary-evaluation.json",
+      "sha256": "c65993133ad729bd3b0eaf075bfd7ea36d57a03b3cc78b2959399f952568a2f5",
+      "bytes": 2215
+    },
+    {
+      "path": "candidate-evaluation.json",
+      "sha256": "6ceb709f2dc524693db5b79a1eb1a10566bb06b927a4a05ad3d6715e075121a2",
+      "bytes": 36621
+    },
+    {
+      "path": "chatgpt-web-transcriptions.json",
+      "sha256": "210824e103a42faae67deed8801658d24ac50c0a8af353c47f8806a627db9dd2",
+      "bytes": 16117
+    },
+    {
+      "path": "loco-validation.json",
+      "sha256": "dca4f7bda47f8ec3cbe72cef1b3a59d241d4466cde775133b44737720f9266db",
+      "bytes": 42168
+    },
+    {
+      "path": "runpod-comparison.json",
+      "sha256": "d46f616b3890bb53339341b06e01839a71fd8fea5fb5347e0c2fdc0a56c78037",
+      "bytes": 3189
+    },
+    {
+      "path": "semantic-roles.json",
+      "sha256": "c53c093b74405f1f6324931524e24a3d178d48cfbc9004bcc468ded3923c61ec",
+      "bytes": 17738
+    },
+    {
+      "path": "vad-corpus.json",
+      "sha256": "4a5e84dde2e1e6f1074ac1be3f1d2ff39aae7e8bb641d13ac940e5456af2c2cc",
+      "bytes": 34135
+    }
+  ],
+  "rerun_command": "bash scripts/verify_chatgpt_vad_luna_evidence.sh",
+  "claim_boundary": "Fixed-pause authored TTS corpus; not natural-call or production evidence."
+}
