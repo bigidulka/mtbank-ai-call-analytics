@@ -26,6 +26,10 @@ release-evidence/external-speech-2026-08-01/*
 !release-evidence/external-speech-2026-08-01/manifest.json
 !release-evidence/external-speech-2026-08-01/summary.json
 !release-evidence/external-speech-2026-08-01/run-evaluator.py
+!release-evidence/semantic-role-model-comparison-2026-08-02/
+release-evidence/semantic-role-model-comparison-2026-08-02/*
+!release-evidence/semantic-role-model-comparison-2026-08-02/manifest.json
+!release-evidence/semantic-role-model-comparison-2026-08-02/summary.json
 secrets/
 models/artifacts/
 models/*

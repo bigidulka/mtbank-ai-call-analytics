@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "kind": "privacy-safe-semantic-role-model-comparison-summary",
+  "status": "completed",
+  "scope": "aggregate-only; external transcripts, role assignments, names, and model observations excluded",
+  "provenance": {
+    "comparison_sha256": "661e32648ffe74b269a18f09428931541cd7ff45ec473710812406fda87efa36",
+    "comparison_evaluator_sha256": "513276f7323c026d93d746fc83ad77b60dfdfff13e5ec8e29f50f2603747ba76",
+    "frozen_input_sha256": "49acd880c14f3f2513e8e5b9fe4dfc3b0b69db380635e791161545dfab1c01c0",
+    "prompt_hash": "5561ad4216dc28186270ae94edb714b674f25306365799e316ddc27f6a5aa645",
+    "scored_sha256": "336c8dfc3be7b235142aa0714a524abfee35703c1886e2565679bcc075c30e0b",
+    "score_evaluator_sha256": "418c1c80e096893ace9a7f3c4d8e94b19f3d14c8d78739cdfd03862592f4e368",
+    "references_sha256": "d7e0300b3f3bff5c78415643c28cb2d61f6f77796bd639e888d39706a9c43d1f",
+    "annotation_boundary": "references cryptographically bind frozen comparison; chronology and annotator blinding remain author-attested"
+  },
+  "design": {
+    "models": [
+      "gpt-5.6-luna",
+      "gpt-5.6-terra",
+      "gpt-5.6-sol"
+    ],
+    "files": 12,
+    "repeats": 3,
+    "successful_runs": 108,
+    "request_attempts": 110,
+    "retried_runs": 2,
+    "temperature": 0,
+    "identical_frozen_inputs": true,
+    "references_used_in_inference": false,
+    "schedule_seed": 20260802,
+    "schedule_strategy": "seeded randomized model/file/repeat order"
+  },
+  "model_summary": {
+    "gpt-5.6-luna": {
+      "runs": 36,
+      "request_attempts": 36,
+      "retried_runs": 0,
+      "median_latency_ms": 5697.3935,
+      "mean_latency_ms": 12790.918611111112,
+      "fixed_alignment_completed": 30,
+      "adaptive_alignment_completed": 36,
+      "mean_turns": 7.305555555555555,
+      "mean_confidence": 0.7387587273615112
+    },
+    "gpt-5.6-terra": {
+      "runs": 36,
+      "request_attempts": 38,
+      "retried_runs": 2,
+      "median_latency_ms": 5189.780000000001,
+      "mean_latency_ms": 13201.876916666668,
+      "fixed_alignment_completed": 30,
+      "adaptive_alignment_completed": 36,
+      "mean_turns": 7.416666666666667,
+      "mean_confidence": 0.7664985054705642
+    },
+    "gpt-5.6-sol": {
+      "runs": 36,
+      "request_attempts": 36,
+      "retried_runs": 0,
+      "median_latency_ms": 5557.429,
+      "mean_latency_ms": 12245.184611111112,
+      "fixed_alignment_completed": 30,
+      "adaptive_alignment_completed": 36,
+      "mean_turns": 7.305555555555555,
+      "mean_confidence": 0.749109174952032
+    }
+  },
+  "within_model_stability": {
+    "gpt-5.6-luna": {
+      "stable_files": 10,
+      "files": 12,
+      "stability": 0.8333333333333334
+    },
+    "gpt-5.6-terra": {
+      "stable_files": 8,
+      "files": 12,
+      "stability": 0.6666666666666666
+    },
+    "gpt-5.6-sol": {
+      "stable_files": 7,
+      "files": 12,
+      "stability": 0.5833333333333334
+    }
+  },
+  "within_model_disagreement": {
+    "gpt-5.6-luna": {
+      "mean_word_role_disagreement": 0.0035931400287921526,
+      "mean_real_call_word_role_disagreement": 0.021558840172752915,
+      "identical_repeat_pairs": 30,
+      "repeat_pairs": 36
+    },
+    "gpt-5.6-terra": {
+      "mean_word_role_disagreement": 0.11395124345631023,
+      "mean_real_call_word_role_disagreement": 0.01704079407119475,
+      "identical_repeat_pairs": 26,
+      "repeat_pairs": 36
+    },
+    "gpt-5.6-sol": {
+      "mean_word_role_disagreement": 0.16795317209661884,
+      "mean_real_call_word_role_disagreement": 0.007719032579712909,
+      "identical_repeat_pairs": 24,
+      "repeat_pairs": 36
+    }
+  },
+  "between_model": {
+    "all_models_identical_file_repeats": 24,
+    "file_repeats": 36,
+    "mean_three_model_word_role_disagreement": 0.11589189015527326,
+    "median_three_model_word_role_disagreement": 0.0,
+    "pairwise": {
+      "gpt-5.6-luna__gpt-5.6-terra": {
+        "mean_word_role_disagreement": 0.11671726739191889,
+        "mean_real_call_word_role_disagreement": 0.033636937684846664,
+        "identical_file_repeats": 26,
+        "file_repeats": 36
+      },
+      "gpt-5.6-luna__gpt-5.6-sol": {
+        "mean_word_role_disagreement": 0.11733336082382717,
+        "mean_real_call_word_role_disagreement": 0.03733349827629636,
+        "identical_file_repeats": 26,
+        "file_repeats": 36
+      },
+      "gpt-5.6-terra__gpt-5.6-sol": {
+        "mean_word_role_disagreement": 0.11362504225007372,
+        "mean_real_call_word_role_disagreement": 0.015083586833775748,
+        "identical_file_repeats": 26,
+        "file_repeats": 36
+      }
+    }
+  },
+  "post_run_manual_reference_score": {
+    "gpt-5.6-luna": {
+      "role_accuracy_mean": 0.3946424666299327,
+      "role_accuracy_stdev": 0.1030362660760209,
+      "role_der_mean": 0.6071659880626239,
+      "speaker_attributed_wer_mean": 0.315693857365748
+    },
+    "gpt-5.6-terra": {
+      "role_accuracy_mean": 0.46755391960383513,
+      "role_accuracy_stdev": 0.1060003257311632,
+      "role_der_mean": 0.5342545350887214,
+      "speaker_attributed_wer_mean": 0.2778123557179475
+    },
+    "gpt-5.6-sol": {
+      "role_accuracy_mean": 0.5013765269560669,
+      "role_accuracy_stdev": 0.06931084118242095,
+      "role_der_mean": 0.5004319277364896,
+      "speaker_attributed_wer_mean": 0.26862905183805386
+    }
+  },
+  "claims": {
+    "model_dependence": "randomized paired run shows model-associated differences beyond frozen ASR/VAD input; same-model nondeterminism remains a competing source of variation",
+    "best_observed_model": "gpt-5.6-sol on two manually post-annotated real calls",
+    "production_winner": "not established: only two calls, source timestamps/transcripts are imperfect, roles were not double-annotated",
+    "fixed_padding": "all models failed fixed 0.2/0.9 padding on both real calls; model choice does not fix core alignment topology"
+  }
+}

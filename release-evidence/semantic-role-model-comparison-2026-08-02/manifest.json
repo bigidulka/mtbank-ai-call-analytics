@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "kind": "semantic-role-model-comparison-evidence-manifest",
+  "scope": "privacy-safe aggregate evidence only",
+  "files": [
+    {
+      "path": "summary.json",
+      "sha256": "b8aef89c0ae859b9b1f36ad3e41924978a4ed4a605b3cc9e14d1674e3182bf70",
+      "bytes": 5845
+    }
+  ],
+  "verification_command": "uv run python scripts/verify_semantic_model_comparison.py",
+  "claim_boundary": "No raw external transcripts, assignments, references, names or provider observations. Sol is best observed on two post-run manually role-annotated calls, not an established production winner."
+}
