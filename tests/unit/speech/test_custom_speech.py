@@ -83,6 +83,37 @@ def test_openai_flat_transcriber_sends_one_bounded_allowlisted_request(tmp_path:
     assert result.provider_metadata.request_id == "request-1"
 
 
+def test_bridge_transcription_is_attested_as_the_bridge_not_an_official_provider(tmp_path: Path) -> None:
+    audio_path = tmp_path / "normalized.wav"
+    audio_path.write_bytes(b"RIFF-test")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == "http://chatgpt-bridge:37182/v1/audio/transcriptions"
+        return httpx.Response(200, stream=httpx.ByteStream(b'{"text":"hello"}'))
+
+    settings = _settings().model_copy(
+        update={
+            "asr_endpoint": TypeAdapter(HttpUrl).validate_python("http://chatgpt-bridge:37182/v1/audio/transcriptions"),
+            "pipeline_revision": "speech/chatgpt-bridge-semantic-vad-v1",
+        }
+    )
+    transcriber = OpenAiFlatTranscriber(
+        settings,
+        client_factory=lambda **kwargs: httpx.Client(transport=httpx.MockTransport(handler), **kwargs),
+    )
+    result = transcriber.transcribe(
+        NormalizedAudio(
+            path=audio_path,
+            duration_seconds=1.0,
+            audio_sha256="a" * 64,
+            source_format="wav",
+        ),
+        language="ru",
+    )
+
+    assert result.provider_metadata.provider == "chatgpt-bridge"
+
+
 def test_adaptive_vad_alignment_reduces_padding_without_overlap() -> None:
     turns = (
         _turn(0, 1, "Оператор"),

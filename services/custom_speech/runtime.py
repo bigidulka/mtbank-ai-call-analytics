@@ -43,6 +43,9 @@ _EVENT = re.compile(r"silence_(start|end):\s*([0-9.]+)")
 _MAX_VAD_OUTPUT_BYTES = 64 * 1024
 _MAX_ASR_RESPONSE_BYTES = 4 * 1024 * 1024
 _MAX_ROLE_RESPONSE_BYTES = 2 * 1024 * 1024
+# Attestation provenance must name the backend that actually produced the text; anything
+# the endpoint allowlist admits beyond the two official providers is the internal bridge.
+_PROVIDER_BY_HOST = {"api.openai.com": "openai", "api.groq.com": "groq"}
 
 
 class FlatAsrResult(StrictFrozenModel):
@@ -96,7 +99,7 @@ class OpenAiFlatTranscriber:
                 text = payload.get("text") if isinstance(payload, dict) else None
                 if not isinstance(text, str) or not text.strip():
                     raise ValueError("custom ASR response has no text")
-                provider = "openai" if self._settings.asr_endpoint.host == "api.openai.com" else "groq"
+                provider = _PROVIDER_BY_HOST.get(self._settings.asr_endpoint.host or "", "chatgpt-bridge")
                 return FlatAsrResult(
                     text=text.strip(),
                     provider_metadata=ASRProviderMetadata(
