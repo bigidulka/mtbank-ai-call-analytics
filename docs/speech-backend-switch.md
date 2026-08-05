@@ -68,13 +68,44 @@ Upstream `chatgpt-transcribe-connect` refuses to bind any non-loopback address b
 
 The real exposure boundary is therefore entirely in `docker-compose.chatgpt-bridge.yml`: the daemon is published only to `127.0.0.1:37182` on the host (never `0.0.0.0`), so it is unreachable from outside the host itself; other containers reach it only via the internal Docker network as `chatgpt-bridge:37182`.
 
-### Why pairing cannot be automated
+### Pairing cannot be automated by an assistant
 
-The browser extension (`services/chatgpt-bridge/extension/`) has `const DAEMON = "http://127.0.0.1:37182"` hardcoded. Pairing therefore requires a real browser, with the extension loaded and signed into `chatgpt.com`, that can reach `127.0.0.1:37182` — which on a headless server means SSH-tunnelling that port from the operator's own machine. This step is inherently manual; nothing in this repository can perform it on your behalf, and no assistant session should be asked to.
+Credential submission always originates from the operator's own machine, not from any script this repository runs unattended and not from any assistant session. Two supported paths exist depending on whether a session is already paired locally.
 
-### One-time setup
+### Option A — migrate an already-paired local session (no browser, no tunnel)
 
-1. Start only the bridge, so it can generate its own token files before anything depends on it:
+If `chatgpt-transcribe-connect` is already paired on your own machine (`chatgpt-transcribe-connect status` reports `Connected` there), reuse that session instead of pairing again:
+
+1. Start only the bridge on the server:
+
+   ```bash
+   deploy/speech-backend bridge-up
+   ```
+
+2. From your own machine, run:
+
+   ```bash
+   services/chatgpt-bridge/scripts/migrate-local-session.sh <ssh-host> <deploy-path>
+   ```
+
+   This issues a one-time pairing code on the server, then pipes your local session credential from the OS keyring (`secret-tool lookup service chatgpt-transcribe-connect account chatgpt-web-session`) directly over SSH into the bridge container's own `python3`, which POSTs it to `/internal/pair` — the identical endpoint and payload shape the browser extension itself would send. The credential is never written to a file on either machine, never passed as a command-line argument, and never captured by this script's own output; it also never passes through this repository's scripts, `deploy/speech-backend`, or any assistant session.
+
+3. Verify, then switch:
+
+   ```bash
+   deploy/speech-backend bridge-status
+   deploy/speech-backend custom-bridge
+   ```
+
+The bridge's `MTBANK_CUSTOM_SPEECH__ASR_API_KEY` still needs `CHATGPT_BRIDGE_API_TOKEN` set in `.env` — see step 7 under Option B; that token identifies callers to this daemon and is unrelated to the ChatGPT session credential migrated above.
+
+### Option B — fresh pairing through a browser
+
+Use this when no local session already exists, or the local one has expired.
+
+The browser extension (`services/chatgpt-bridge/extension/`) has `const DAEMON = "http://127.0.0.1:37182"` hardcoded, so pairing needs a real browser that can reach that exact address. On a headless server that means tunnelling the port to your own machine:
+
+1. Start only the bridge:
 
    ```bash
    deploy/speech-backend bridge-up
@@ -123,5 +154,5 @@ The browser extension (`services/chatgpt-bridge/extension/`) has `const DAEMON =
 - `deploy/speech-backend bridge-status` reports `connected`/`not connected` without revealing credentials.
 - `deploy/speech-backend runpod` stops both `custom-speech` and `chatgpt-bridge` when rolling back.
 - The account behind the bridge is subject to ChatGPT's own usage limits; a `usage_limit_reached` response surfaces as an upstream ASR failure, not a bridge crash.
-- Re-run the pairing sequence (steps 2–7) whenever the session expires (`bridge-status` reports `not connected`) or after `chatgpt-transcribe-connect logout` inside the container.
+- Re-run Option A or B whenever the session expires (`bridge-status` reports `not connected`) or after `chatgpt-transcribe-connect logout` inside the container.
 - Credentials persist in the `chatgpt-bridge-config` named volume, protected at `0600`; the daemon prefers the Linux Secret Service when available and otherwise falls back automatically to a `0600` Base64-encoded file, which is access control, not encryption. Treat the host's disk and backups accordingly.

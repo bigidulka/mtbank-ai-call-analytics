@@ -328,6 +328,32 @@ def test_custom_speech_overlay_is_explicit_no_gpu_backend() -> None:
     assert "RunPod switch verification failed" in switch
 
 
+def test_chatgpt_bridge_overlay_publishes_loopback_only() -> None:
+    bridge_overlay = (ROOT / "docker-compose.chatgpt-bridge.yml").read_text(encoding="utf-8")
+    custom_overlay = (ROOT / "docker-compose.custom-speech.yml").read_text(encoding="utf-8")
+    switch = (ROOT / "deploy" / "speech-backend").read_text(encoding="utf-8")
+
+    assert '"127.0.0.1:37182:37182"' in bridge_overlay
+    assert '"0.0.0.0:37182:37182"' not in bridge_overlay
+    assert "chatgpt-bridge:37182" in bridge_overlay
+    assert "CHATGPT_BRIDGE_API_TOKEN:-" in bridge_overlay
+    assert "OPENAI_TRANSCRIPTION_API_KEY:-" in custom_overlay
+    assert "bridge-up" in switch
+    assert "bridge-pair" in switch
+    assert "bridge-token-path" in switch
+    assert "custom-bridge" in switch
+
+
+def test_chatgpt_bridge_migration_script_never_persists_the_credential() -> None:
+    script = (ROOT / "services" / "chatgpt-bridge" / "scripts" / "migrate-local-session.sh").read_text(encoding="utf-8")
+
+    assert "secret-tool lookup" in script
+    assert "/internal/pair" in script
+    assert "chrome-extension://migration" in script
+    for unsafe_pattern in (" > /tmp", "credentials.json", "tee "):
+        assert unsafe_pattern not in script
+
+
 def test_manifest_is_json_compatible_yaml_for_dependency_free_validation() -> None:
     payload = json.loads((ROOT / "test_data" / "manifest.yaml").read_text(encoding="utf-8"))
 
