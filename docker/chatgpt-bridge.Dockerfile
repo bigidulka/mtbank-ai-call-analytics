@@ -23,7 +23,10 @@ RUN if [ -f /etc/apt/sources.list ]; then sed -i 's|http://deb.debian.org|https:
     && apt-get install --no-install-recommends --yes ffmpeg ca-certificates libdbus-1-3 libsystemd0 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 app \
-    && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin app
+    && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin app \
+    && mkdir -p /home/app/.config/chatgpt-transcribe-connect \
+    && chown -R app:app /home/app \
+    && chmod 700 /home/app/.config/chatgpt-transcribe-connect
 
 COPY --from=builder /build/target/release/chatgpt-transcribe-connect /usr/local/bin/chatgpt-transcribe-connect
 
