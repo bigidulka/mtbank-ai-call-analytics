@@ -29,8 +29,12 @@ services:
       MTBANK_CUSTOM_SPEECH__ASR_API_KEY: ${OPENAI_TRANSCRIPTION_API_KEY:-}
       MTBANK_CUSTOM_SPEECH__ASR_ENDPOINT: ${OPENAI_TRANSCRIPTION_ENDPOINT:-https://api.openai.com/v1/audio/transcriptions}
       MTBANK_CUSTOM_SPEECH__ASR_MODEL: ${OPENAI_TRANSCRIPTION_MODEL:-gpt-4o-transcribe}
-      MTBANK_CUSTOM_SPEECH__ROLE_BASE_URL: ${MTBANK_AGENT_RUNTIME__GATEWAY__BASE_URL:?set gateway URL}
-      MTBANK_CUSTOM_SPEECH__ROLE_API_KEY: ${MTBANK_AGENT_RUNTIME__GATEWAY__API_KEY:?set gateway key}
+      # Semantic role reconstruction defaults to the application gateway, but may be pointed
+      # at its own gateway/key: this leg is on the critical path of transcription itself, so a
+      # quota block here takes the whole backend down, unlike for the analysis agents.
+      # CustomSpeechSettings fails closed on startup if the resolved value is empty or non-HTTPS.
+      MTBANK_CUSTOM_SPEECH__ROLE_BASE_URL: ${MTBANK_CUSTOM_SPEECH_ROLE_BASE_URL:-$MTBANK_AGENT_RUNTIME__GATEWAY__BASE_URL}
+      MTBANK_CUSTOM_SPEECH__ROLE_API_KEY: ${MTBANK_CUSTOM_SPEECH_ROLE_API_KEY:-$MTBANK_AGENT_RUNTIME__GATEWAY__API_KEY}
       MTBANK_CUSTOM_SPEECH__ROLE_MODEL: ${MTBANK_CUSTOM_SPEECH__ROLE_MODEL:-gpt-5.6-sol}
       MTBANK_CUSTOM_SPEECH__ROLE_TIMEOUT_SECONDS: "30"
       MTBANK_CUSTOM_SPEECH__VAD_NOISE_DB: "-45"

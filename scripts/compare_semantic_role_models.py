@@ -273,8 +273,8 @@ def _validate_input(path: Path) -> tuple[dict[str, object], ...]:
 def run(arguments: argparse.Namespace) -> dict[str, object]:
     files = _validate_input(arguments.input)
     models = tuple(arguments.models.split(","))
-    if len(models) != 3 or len(set(models)) != 3:
-        raise ValueError("exactly three unique models are required")
+    if len(models) < 2 or len(set(models)) != len(models):
+        raise ValueError("at least two unique models are required")
     if arguments.repeats < 2 or arguments.repeats > 5:
         raise ValueError("repeats must be in [2, 5]")
     if arguments.max_attempts < 1 or arguments.max_attempts > 3:

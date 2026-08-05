@@ -22,6 +22,14 @@ def _sha256(path: Path) -> str:
 
 
 def _load_references(path: Path, *, expected_comparison_sha256: str) -> dict[str, tuple[Segment, ...]]:
+    """Load references bound to `expected_comparison_sha256`.
+
+    The binding proves the annotator could not see the comparison being scored. Scoring a
+    *later* comparison against references frozen for an earlier one preserves that property
+    — the outputs did not exist when the annotation was made — so the caller may pass the
+    earlier comparison's digest, which `score` then records in provenance.
+    """
+
     payload = json.loads(path.read_text(encoding="utf-8"))
     if (
         payload.get("status") != "completed"
@@ -83,7 +91,8 @@ def score(arguments: argparse.Namespace) -> dict[str, object]:
     comparison = json.loads(arguments.comparison.read_text(encoding="utf-8"))
     frozen = json.loads(arguments.input.read_text(encoding="utf-8"))
     comparison_sha256 = _sha256(arguments.comparison)
-    references = _load_references(arguments.references, expected_comparison_sha256=comparison_sha256)
+    bound_to = arguments.references_bound_to or comparison_sha256
+    references = _load_references(arguments.references, expected_comparison_sha256=bound_to)
     if comparison.get("status") != "completed" or frozen.get("status") != "completed":
         raise ValueError("comparison/input is incomplete")
     if comparison["provenance"]["input_sha256"] != _sha256(arguments.input):
@@ -164,6 +173,8 @@ def score(arguments: argparse.Namespace) -> dict[str, object]:
             "comparison_sha256": comparison_sha256,
             "input_sha256": _sha256(arguments.input),
             "references_sha256": _sha256(arguments.references),
+            "references_bound_comparison_sha256": bound_to,
+            "references_predate_comparison": bound_to != comparison_sha256,
             "evaluator_sha256": _sha256(Path(__file__).resolve()),
             "annotation_boundary": (
                 "references cryptographically bind frozen comparison; chronology and annotator blinding remain "
@@ -188,6 +199,14 @@ def main() -> int:
     parser.add_argument("--comparison", type=Path, required=True)
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--references", type=Path, required=True)
+    parser.add_argument(
+        "--references-bound-to",
+        default=None,
+        help=(
+            "Digest of the earlier comparison the references were annotated against. Use when scoring a later "
+            "comparison with references that predate it; recorded in provenance."
+        ),
+    )
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
     result = score(arguments)

@@ -343,6 +343,13 @@ def test_chatgpt_bridge_overlay_publishes_loopback_only() -> None:
     assert "CHATGPT_BRIDGE_EGRESS_PROXY" not in custom_overlay
     assert "CHATGPT_BRIDGE_EGRESS_PROXY=" in (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "OPENAI_TRANSCRIPTION_API_KEY:-" in custom_overlay
+    # The role gateway is overridable on its own, but still defaults to the application gateway
+    # rather than silently resolving to empty.
+    for variable in ("BASE_URL", "API_KEY"):
+        assert (
+            f"${{MTBANK_CUSTOM_SPEECH_ROLE_{variable}:-$MTBANK_AGENT_RUNTIME__GATEWAY__{variable}}}" in custom_overlay
+        )
+        assert f"MTBANK_CUSTOM_SPEECH_ROLE_{variable}=" in (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "bridge-up" in switch
     assert "bridge-pair" in switch
     assert "bridge-token-path" in switch
