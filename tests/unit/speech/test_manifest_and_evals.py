@@ -313,6 +313,21 @@ def test_speech_images_profiles_and_lock_are_staticly_pinned() -> None:
     assert "image@sha256" in runpod_readme
 
 
+def test_custom_speech_overlay_is_explicit_no_gpu_backend() -> None:
+    overlay = (ROOT / "docker-compose.custom-speech.yml").read_text(encoding="utf-8")
+    switch = (ROOT / "deploy" / "speech-backend").read_text(encoding="utf-8")
+
+    assert "http://custom-speech:8010" in overlay
+    assert "OPENAI_TRANSCRIPTION_API_KEY" in overlay
+    assert "gpt-5.6-sol" in overlay
+    assert "speech/openai-semantic-vad-v1" in overlay
+    assert "model-egress" in overlay
+    assert "docker-compose.runpod.yml" in switch
+    assert "docker-compose.custom-speech.yml" in switch
+    assert "custom switch verification failed" in switch
+    assert "RunPod switch verification failed" in switch
+
+
 def test_manifest_is_json_compatible_yaml_for_dependency_free_validation() -> None:
     payload = json.loads((ROOT / "test_data" / "manifest.yaml").read_text(encoding="utf-8"))
 

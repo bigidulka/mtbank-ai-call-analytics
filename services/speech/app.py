@@ -509,6 +509,9 @@ def _matches_bearer_key(authorizations: list[str], settings: SpeechSettings) -> 
 
 
 def _runtime_attestation(settings: SpeechSettings, runtime: SpeechRuntimePort) -> dict[str, object]:
+    custom_attestation = getattr(runtime, "runtime_attestation", None)
+    if callable(custom_attestation):
+        return cast(dict[str, object], custom_attestation())
     asr, diarization = runtime.model_revisions()
     attestation_runtime: dict[str, object] = {
         "device": settings.runtime.device,

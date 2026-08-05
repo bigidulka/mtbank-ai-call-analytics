@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT Transcribe Connector",
+  "version": "0.1.0",
+  "description": "Securely connect your ChatGPT Web session to the local transcription daemon.",
+  "permissions": ["cookies", "storage"],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "http://127.0.0.1:37182/*"
+  ],
+  "action": {
+    "default_title": "ChatGPT Transcribe Connector",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

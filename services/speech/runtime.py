@@ -20,7 +20,6 @@ from services.speech.errors import (
 )
 from services.speech.manifest import ModelRegistry
 from services.speech.media import MediaLimits, MediaNormalizer
-from services.speech.role_agent import LlmRoleResolver
 from services.speech.settings import FasterWhisperSettings, SpeechRuntimeSettings, SpeechSettings
 from services.speech.streaming import ProductionStreamingSpeechAdapter
 
@@ -68,6 +67,8 @@ class LazySpeechRuntime:
         if role_resolver is _DEFAULT_ROLE_RESOLVER:
             if settings.role_agent is None:
                 raise SpeechConfigurationError("role agent configuration is unavailable")
+            from services.speech.role_agent import LlmRoleResolver
+
             self._role_resolver = LlmRoleResolver(settings.role_agent)
         else:
             self._role_resolver = cast(RoleResolverPort | None, role_resolver)
