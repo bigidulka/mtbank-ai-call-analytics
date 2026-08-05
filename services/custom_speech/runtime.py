@@ -209,35 +209,53 @@ class SemanticTurnResolver:
             "temperature": 0,
             "max_tokens": 8_000,
         }
-        try:
-            with self._client_factory(
-                timeout=httpx.Timeout(
-                    self._settings.role_timeout_seconds,
-                    connect=min(5.0, self._settings.role_timeout_seconds),
-                ),
-                trust_env=False,
-                follow_redirects=False,
-            ) as client:
-                with client.stream(
-                    "POST",
-                    f"{str(self._settings.role_base_url).rstrip('/')}/chat/completions",
-                    json=request_payload,
-                    headers={
-                        "Authorization": f"Bearer {self._settings.role_api_key.get_secret_value()}",
-                        "Accept-Encoding": "identity",
-                    },
-                ) as response:
-                    content = _bounded_response(response, _MAX_ROLE_RESPONSE_BYTES)
-                    if not 200 <= response.status_code < 300:
-                        raise SpeechProviderError("semantic role request failed")
-            parsed = json.loads(content)
-            decision = _flat_decision(parsed, expected_model=self._settings.role_model)
-            _validate_turn_coverage(decision.turns, len(words))
-            return _merge_same_role(decision.turns)
-        except SpeechProviderError:
-            raise
-        except (httpx.HTTPError, TypeError, ValueError, ValidationError, json.JSONDecodeError) as error:
-            raise SpeechProviderError("semantic role request failed") from error
+        # This leg is the only one that can fail without the audio being at fault: gateways
+        # return transient 5xx, and even models that honour the strict schema most of the time
+        # occasionally emit a malformed or partial turn list. A single attempt turns each of
+        # those into a failed transcription, so retry a bounded number of times. The request is
+        # deterministic (temperature 0) and has no side effects, so replaying it is safe.
+        last_error: Exception | None = None
+        for attempt in range(self._settings.role_max_attempts):
+            try:
+                return self._resolve_once(request_payload, word_count=len(words))
+            except (
+                SpeechProviderError,
+                httpx.HTTPError,
+                TypeError,
+                ValueError,
+                ValidationError,
+                json.JSONDecodeError,
+            ) as error:
+                last_error = error
+                if attempt + 1 < self._settings.role_max_attempts:
+                    time.sleep(min(2.0, 0.25 * (2**attempt)))
+        raise SpeechProviderError("semantic role request failed") from last_error
+
+    def _resolve_once(self, request_payload: dict[str, object], *, word_count: int) -> tuple[FlatTurn, ...]:
+        with self._client_factory(
+            timeout=httpx.Timeout(
+                self._settings.role_timeout_seconds,
+                connect=min(5.0, self._settings.role_timeout_seconds),
+            ),
+            trust_env=False,
+            follow_redirects=False,
+        ) as client:
+            with client.stream(
+                "POST",
+                f"{str(self._settings.role_base_url).rstrip('/')}/chat/completions",
+                json=request_payload,
+                headers={
+                    "Authorization": f"Bearer {self._settings.role_api_key.get_secret_value()}",
+                    "Accept-Encoding": "identity",
+                },
+            ) as response:
+                content = _bounded_response(response, _MAX_ROLE_RESPONSE_BYTES)
+                if not 200 <= response.status_code < 300:
+                    raise SpeechProviderError("semantic role request failed")
+        parsed = json.loads(content)
+        decision = _flat_decision(parsed, expected_model=self._settings.role_model)
+        _validate_turn_coverage(decision.turns, word_count)
+        return _merge_same_role(decision.turns)
 
     def close(self) -> None:
         return None

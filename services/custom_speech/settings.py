@@ -47,6 +47,7 @@ class CustomSpeechSettings(BaseSettings):
     role_api_key: SecretStr
     role_model: NonEmptyId = "gpt-5.6-sol"
     role_timeout_seconds: PositiveFloat = 30.0
+    role_max_attempts: PositiveInt = 3
     max_words: PositiveInt = 1_200
     vad_noise_db: float = -45.0
     vad_minimum_silence_seconds: PositiveFloat = 0.25
@@ -85,6 +86,10 @@ class CustomSpeechSettings(BaseSettings):
             raise ValueError("role gateway must use HTTPS without query or fragment")
         if self.max_words > 1_200:
             raise ValueError("semantic word bound cannot exceed tool schema")
+        # Retries are bounded so a failing gateway cannot hold a transcription request open
+        # for role_max_attempts * role_timeout_seconds beyond the caller's own deadline.
+        if self.role_max_attempts > 5:
+            raise ValueError("role attempts cannot exceed 5")
         if not -100.0 <= self.vad_noise_db <= 0.0:
             raise ValueError("VAD noise threshold must be between -100 and 0 dB")
         return self

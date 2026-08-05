@@ -8,6 +8,7 @@ import hashlib
 import json
 import statistics
 from pathlib import Path
+from typing import cast
 
 if __package__:
     from .evaluate_speech import Segment, speaker_attributed_wer
@@ -142,7 +143,13 @@ def score(arguments: argparse.Namespace) -> dict[str, object]:
         by_file: dict[str, object] = {}
         for identifier in references:
             file_runs = [item for item in relevant if item["id"] == identifier]
+            # A model whose runs on this file all failed upstream has no score here; reporting
+            # null keeps that visible instead of letting the remaining file carry its average.
+            if not file_runs:
+                by_file[identifier] = {"runs": 0}
+                continue
             by_file[identifier] = {
+                "runs": len(file_runs),
                 "role_accuracy_mean": statistics.fmean(
                     _value(item, "time_weighted_role_accuracy") for item in file_runs
                 ),
@@ -155,8 +162,12 @@ def score(arguments: argparse.Namespace) -> dict[str, object]:
                     _value(item, "speaker_attributed_wer") for item in file_runs
                 ),
             }
+        if not relevant:
+            summary[model] = {"runs": 0, "by_file": by_file}
+            continue
         summary[model] = {
             "runs": len(relevant),
+            "scored_files": sum(1 for entry in by_file.values() if cast(dict[str, object], entry)["runs"]),
             "role_accuracy_mean": statistics.fmean(_value(item, "time_weighted_role_accuracy") for item in relevant),
             "role_accuracy_stdev": statistics.pstdev(_value(item, "time_weighted_role_accuracy") for item in relevant),
             "role_der_mean": statistics.fmean(_value(item, "role_der") for item in relevant),

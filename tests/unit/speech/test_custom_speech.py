@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -12,6 +13,7 @@ from mtbank_ai.speech.contracts import SpeechFile
 from services.custom_speech.runtime import (
     FlatTurn,
     OpenAiFlatTranscriber,
+    SemanticTurnResolver,
     SemanticVadSpeechRuntime,
     VadAnchor,
     _align_turns,
@@ -112,6 +114,75 @@ def test_bridge_transcription_is_attested_as_the_bridge_not_an_official_provider
     )
 
     assert result.provider_metadata.provider == "chatgpt-bridge"
+
+
+def _role_response(turns: object) -> httpx.Response:
+    body = {
+        "model": "gpt-5.6-sol",
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+        "choices": [
+            {
+                "message": {
+                    "tool_calls": [
+                        {
+                            "type": "function",
+                            "function": {
+                                "name": "submit_flat_turns",
+                                "arguments": json.dumps({"turns": turns}, ensure_ascii=False),
+                            },
+                        }
+                    ]
+                }
+            }
+        ],
+    }
+    return httpx.Response(200, stream=httpx.ByteStream(json.dumps(body, ensure_ascii=False).encode()))
+
+
+def test_semantic_role_resolver_retries_a_transient_malformed_decision() -> None:
+    good = [
+        {
+            "start_word_index": 0,
+            "end_word_index": 1,
+            "role": "Оператор",
+            "confidence": 0.9,
+            "evidence": "test evidence",
+        }
+    ]
+    responses = [_role_response([20]), _role_response(good)]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return responses.pop(0)
+
+    resolver = SemanticTurnResolver(
+        _settings(),
+        client_factory=lambda **kwargs: httpx.Client(transport=httpx.MockTransport(handler), **kwargs),
+    )
+
+    turns = resolver.resolve(("добрый", "день"))
+
+    assert [turn.role for turn in turns] == ["Оператор"]
+    assert not responses
+
+
+def test_semantic_role_resolver_stops_at_the_attempt_budget() -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return _role_response([20])
+
+    settings = _settings().model_copy(update={"role_max_attempts": 2})
+    resolver = SemanticTurnResolver(
+        settings,
+        client_factory=lambda **kwargs: httpx.Client(transport=httpx.MockTransport(handler), **kwargs),
+    )
+
+    with pytest.raises(SpeechProviderError, match="semantic role request failed"):
+        resolver.resolve(("добрый", "день"))
+
+    assert attempts == 2
 
 
 def test_adaptive_vad_alignment_reduces_padding_without_overlap() -> None:

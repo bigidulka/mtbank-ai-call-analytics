@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Paired comparison of Luna, Terra and Sol on identical flat ASR transcripts."""
+"""Paired comparison of gateway models on identical flat ASR transcripts."""
 
 from __future__ import annotations
 
@@ -285,6 +285,7 @@ def run(arguments: argparse.Namespace) -> dict[str, object]:
     prompt, prompt_hash, tool = _prompt()
     client = OpenAI(api_key=api_key, base_url=arguments.base_url, timeout=arguments.timeout_seconds, max_retries=0)
     runs: list[dict[str, object]] = []
+    failures: list[dict[str, object]] = []
     schedule: list[tuple[int, str, int, dict[str, object]]] = [
         (repeat, model, source_index, source)
         for repeat in range(arguments.repeats)
@@ -299,14 +300,29 @@ def run(arguments: argparse.Namespace) -> dict[str, object]:
             words = text.split()
             if not words or len(words) > MAX_WORDS:
                 raise ValueError(f"word count invalid for {identifier}")
-            assignments, latency_ms, attempts = _decision(
-                client,
-                model=model,
-                prompt=prompt,
-                tool=tool,
-                words=words,
-                max_attempts=arguments.max_attempts,
-            )
+            # A provider that exhausts its retries invalidates only its own cell. Aborting the
+            # whole study there would make a run of this size hostage to one flaky response;
+            # the paired analysis below instead drops every cell that is not complete.
+            try:
+                assignments, latency_ms, attempts = _decision(
+                    client,
+                    model=model,
+                    prompt=prompt,
+                    tool=tool,
+                    words=words,
+                    max_attempts=arguments.max_attempts,
+                )
+            except Exception as error:  # noqa: BLE001
+                failures.append(
+                    {
+                        "repeat": repeat,
+                        "model": model,
+                        "id": identifier,
+                        "reason": type(error).__name__,
+                        "message": str(error)[:200].splitlines()[0],
+                    }
+                )
+                continue
             raw_duration = source["audio_seconds"]
             if not isinstance(raw_duration, (int, float)) or isinstance(raw_duration, bool):
                 raise ValueError(f"duration invalid for {identifier}")
@@ -350,12 +366,22 @@ def run(arguments: argparse.Namespace) -> dict[str, object]:
     finally:
         client.close()
     paired: list[dict[str, object]] = []
+    incomplete_cells: list[dict[str, object]] = []
     for repeat in range(arguments.repeats):
         for source in files:
             identifier = str(source["id"])
             relevant = [run for run in runs if run["repeat"] == repeat and run["id"] == identifier]
             if len(relevant) != len(models):
-                raise ValueError("paired run coverage mismatch")
+                # Between-model disagreement is only meaningful when every model answered the
+                # identical input, so an incomplete cell is excluded rather than partially compared.
+                incomplete_cells.append(
+                    {
+                        "repeat": repeat,
+                        "id": identifier,
+                        "answered": sorted(str(run["model"]) for run in relevant),
+                    }
+                )
+                continue
             disagreements: list[float] = []
             for left_index, left in enumerate(relevant):
                 for right in relevant[left_index + 1 :]:
@@ -391,8 +417,12 @@ def run(arguments: argparse.Namespace) -> dict[str, object]:
     model_summary: dict[str, object] = {}
     for model in models:
         relevant = [run for run in runs if run["model"] == model]
+        if not relevant:
+            model_summary[model] = {"runs": 0, "failed_runs": sum(item["model"] == model for item in failures)}
+            continue
         model_summary[model] = {
             "runs": len(relevant),
+            "failed_runs": sum(item["model"] == model for item in failures),
             "request_attempts": sum(_run_int(run, "attempts") for run in relevant),
             "retried_runs": sum(_run_int(run, "attempts") > 1 for run in relevant),
             "median_latency_ms": statistics.median(_run_float(run, "latency_ms") for run in relevant),
@@ -405,12 +435,19 @@ def run(arguments: argparse.Namespace) -> dict[str, object]:
     within_model: dict[str, object] = {}
     for model in models:
         stable = 0
+        measured = 0
         for source in files:
-            signatures = {
-                run["role_boundary_sha256"] for run in runs if run["model"] == model and run["id"] == source["id"]
-            }
-            stable += int(len(signatures) == 1)
-        within_model[model] = {"stable_files": stable, "files": len(files), "stability": stable / len(files)}
+            repeats_present = [run for run in runs if run["model"] == model and run["id"] == source["id"]]
+            # Stability across repeats is undefined for a file the model did not complete every time.
+            if len(repeats_present) != arguments.repeats:
+                continue
+            measured += 1
+            stable += int(len({run["role_boundary_sha256"] for run in repeats_present}) == 1)
+        within_model[model] = {
+            "stable_files": stable,
+            "files": measured,
+            "stability": stable / measured if measured else None,
+        }
     for run in runs:
         run.pop("word_roles")
     return {
@@ -432,10 +469,15 @@ def run(arguments: argparse.Namespace) -> dict[str, object]:
         "repeats": arguments.repeats,
         "files": len(files),
         "runs": runs,
+        "failures": failures,
         "paired": paired,
+        "paired_cells_complete": len(paired),
+        "paired_cells_incomplete": incomplete_cells,
         "model_summary": model_summary,
         "within_model": within_model,
         "claim_boundary": (
+            "Runs that exhausted their retries are recorded in failures and excluded from every aggregate, so "
+            "per-model statistics are conditional on the model having answered. "
             "Randomized paired comparison measures association between selected model and outputs/latency for frozen "
             "inputs. Same-model nondeterminism remains, so causal model effects require comparing between-model and "
             "within-model variation. External reference quality is limited."
