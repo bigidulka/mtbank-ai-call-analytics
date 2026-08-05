@@ -8,6 +8,11 @@
 # file on either machine, never passed as a command-line argument (so it never
 # appears in `ps`), and never captured by this script's own output.
 #
+# ssh joins multiple trailing arguments with spaces and re-parses that on the
+# remote side, which corrupts any quoting/redirection that only existed in the
+# local shell's parse tree. Every remote command here is therefore built and
+# passed as exactly one pre-assembled string.
+#
 # Usage:
 #   services/chatgpt-bridge/scripts/migrate-local-session.sh <ssh-host> <deploy-path>
 #
@@ -17,7 +22,7 @@ set -euo pipefail
 
 HOST="${1:?usage: migrate-local-session.sh <ssh-host> <deploy-path>}"
 DEPLOY_PATH="${2:?usage: migrate-local-session.sh <ssh-host> <deploy-path>}"
-COMPOSE_FILES=(-f "$DEPLOY_PATH/docker-compose.yml" -f "$DEPLOY_PATH/docker-compose.custom-speech.yml" -f "$DEPLOY_PATH/docker-compose.chatgpt-bridge.yml")
+COMPOSE_PREFIX="docker compose -f $DEPLOY_PATH/docker-compose.yml -f $DEPLOY_PATH/docker-compose.custom-speech.yml -f $DEPLOY_PATH/docker-compose.chatgpt-bridge.yml exec -T chatgpt-bridge"
 
 if ! command -v secret-tool >/dev/null 2>&1; then
   echo "secret-tool not found (package: libsecret-tools / libsecret)" >&2
@@ -25,17 +30,14 @@ if ! command -v secret-tool >/dev/null 2>&1; then
 fi
 
 echo "Issuing one-time pairing code on $HOST ..." >&2
-PAIRING_CODE="$(ssh "$HOST" docker compose "${COMPOSE_FILES[@]}" exec -T chatgpt-bridge \
-  chatgpt-transcribe-connect pair | sed -n 's/^Pairing code: //p')"
+PAIRING_CODE="$(ssh "$HOST" "$COMPOSE_PREFIX chatgpt-transcribe-connect pair" | sed -n 's/^Pairing code: //p')"
 if [[ -z "$PAIRING_CODE" ]]; then
   echo "Failed to obtain a pairing code from $HOST" >&2
   exit 1
 fi
 
-echo "Migrating local session credential (never leaves stdin on either side) ..." >&2
-secret-tool lookup service chatgpt-transcribe-connect account chatgpt-web-session | \
-  ssh "$HOST" docker compose "${COMPOSE_FILES[@]}" exec -T chatgpt-bridge \
-    python3 -c '
+echo "Placing migration helper in the container (contains no secret) ..." >&2
+ssh "$HOST" "$COMPOSE_PREFIX tee /tmp/pair-migrate.py >/dev/null" <<'PY'
 import json, sys, urllib.error, urllib.request
 
 pairing_code = sys.argv[1]
@@ -53,6 +55,12 @@ try:
 except urllib.error.HTTPError as error:
     print(error.read().decode(), file=sys.stderr)
     raise SystemExit(1)
-' "$PAIRING_CODE"
+PY
 
-echo "Done. Verify with: ssh $HOST docker compose ${COMPOSE_FILES[*]} exec -T chatgpt-bridge chatgpt-transcribe-connect status" >&2
+echo "Migrating local session credential (never leaves stdin on either side) ..." >&2
+secret-tool lookup service chatgpt-transcribe-connect username chatgpt-web-session | \
+  ssh "$HOST" "$COMPOSE_PREFIX python3 /tmp/pair-migrate.py $PAIRING_CODE"
+
+ssh "$HOST" "$COMPOSE_PREFIX rm -f /tmp/pair-migrate.py"
+
+echo "Done. Verify with: ssh $HOST '$COMPOSE_PREFIX chatgpt-transcribe-connect status'" >&2

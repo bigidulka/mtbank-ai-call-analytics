@@ -88,7 +88,7 @@ If `chatgpt-transcribe-connect` is already paired on your own machine (`chatgpt-
    services/chatgpt-bridge/scripts/migrate-local-session.sh <ssh-host> <deploy-path>
    ```
 
-   This issues a one-time pairing code on the server, then pipes your local session credential from the OS keyring (`secret-tool lookup service chatgpt-transcribe-connect account chatgpt-web-session`) directly over SSH into the bridge container's own `python3`, which POSTs it to `/internal/pair` — the identical endpoint and payload shape the browser extension itself would send. The credential is never written to a file on either machine, never passed as a command-line argument, and never captured by this script's own output; it also never passes through this repository's scripts, `deploy/speech-backend`, or any assistant session.
+   This issues a one-time pairing code on the server, then pipes your local session credential from the OS keyring (`secret-tool lookup service chatgpt-transcribe-connect username chatgpt-web-session`) directly over SSH into the bridge container's own `python3`, which POSTs it to `/internal/pair` — the identical endpoint and payload shape the browser extension itself would send. The credential is never written to a file on either machine, never passed as a command-line argument, and never captured by this script's own output; it also never passes through this repository's scripts, `deploy/speech-backend`, or any assistant session.
 
 3. Verify, then switch:
 

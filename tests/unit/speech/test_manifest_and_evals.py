@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 import tomllib
 from pathlib import Path
 
@@ -347,11 +348,27 @@ def test_chatgpt_bridge_overlay_publishes_loopback_only() -> None:
 def test_chatgpt_bridge_migration_script_never_persists_the_credential() -> None:
     script = (ROOT / "services" / "chatgpt-bridge" / "scripts" / "migrate-local-session.sh").read_text(encoding="utf-8")
 
-    assert "secret-tool lookup" in script
+    assert "secret-tool lookup service chatgpt-transcribe-connect username chatgpt-web-session" in script
     assert "/internal/pair" in script
     assert "chrome-extension://migration" in script
-    for unsafe_pattern in (" > /tmp", "credentials.json", "tee "):
+    # The credential may only ever be read straight into a pipe: never captured into a
+    # shell variable (visible in `ps`/`/proc`), never redirected into a file.
+    assert "$(secret-tool" not in script
+    assert "`secret-tool" not in script
+    for unsafe_pattern in (" > /tmp", "credentials.json"):
         assert unsafe_pattern not in script
+
+    lookup_line = next(line for line in script.splitlines() if line.startswith("secret-tool lookup"))
+    assert lookup_line.rstrip().endswith("| \\")
+
+    # The only file the script writes on the remote side is the helper, whose body is a
+    # heredoc that reads the credential from stdin and must not embed it.
+    written_files = re.findall(r"tee (\S+)", script)
+    assert written_files == ["/tmp/pair-migrate.py"]
+    helper = script.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+    assert "secret-tool" not in helper
+    assert "json.load(sys.stdin)" in helper
+    assert f"rm -f {written_files[0]}" in script
 
 
 def test_manifest_is_json_compatible_yaml_for_dependency_free_validation() -> None:
