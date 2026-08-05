@@ -68,6 +68,32 @@ Upstream `chatgpt-transcribe-connect` refuses to bind any non-loopback address b
 
 The real exposure boundary is therefore entirely in `docker-compose.chatgpt-bridge.yml`: the daemon is published only to `127.0.0.1:37182` on the host (never `0.0.0.0`), so it is unreachable from outside the host itself; other containers reach it only via the internal Docker network as `chatgpt-bridge:37182`.
 
+### Egress prerequisite: the host must be able to reach chatgpt.com
+
+`chatgpt.com` answers `403` to *every* path — including `robots.txt` with an ordinary browser User-Agent — from most datacenter IP ranges. A host in that position fails at the daemon's first upstream call with:
+
+```json
+{"error":{"message":"ChatGPT session refresh failed (403 Forbidden)","type":"upstream_error"}}
+```
+
+This is a network-origin block, not a credential problem: a correctly migrated, unexpired session produces exactly this response. The same block covers `api.openai.com` and `api.groq.com`, so it disqualifies the official-API custom profile on that host too.
+
+Confirm before pairing, from the deploy host:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.custom-speech.yml -f docker-compose.chatgpt-bridge.yml \
+  exec -T chatgpt-bridge python3 -c \
+  "import urllib.request as u; print(u.urlopen('https://chatgpt.com/robots.txt', timeout=20).status)"
+```
+
+A blocked host needs an egress proxy whose exit is in a permitted region:
+
+```dotenv
+CHATGPT_BRIDGE_EGRESS_PROXY=socks5://user:password@proxy.example:1080
+```
+
+Only `chatgpt-bridge` reads this; `NO_PROXY` keeps sibling services on the Docker network. Blank means direct egress.
+
 ### Pairing cannot be automated by an assistant
 
 Credential submission always originates from the operator's own machine, not from any script this repository runs unattended and not from any assistant session. Two supported paths exist depending on whether a session is already paired locally.

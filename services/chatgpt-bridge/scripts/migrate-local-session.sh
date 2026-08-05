@@ -22,6 +22,14 @@ set -euo pipefail
 
 HOST="${1:?usage: migrate-local-session.sh <ssh-host> <deploy-path>}"
 DEPLOY_PATH="${2:?usage: migrate-local-session.sh <ssh-host> <deploy-path>}"
+
+# Both values are spliced into a string that the remote shell re-parses, so each
+# is constrained to characters that carry no meaning there.
+if [[ ! "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]*$ ]]; then
+  echo "deploy path must be absolute and free of shell metacharacters: $DEPLOY_PATH" >&2
+  exit 2
+fi
+
 COMPOSE_PREFIX="docker compose -f $DEPLOY_PATH/docker-compose.yml -f $DEPLOY_PATH/docker-compose.custom-speech.yml -f $DEPLOY_PATH/docker-compose.chatgpt-bridge.yml exec -T chatgpt-bridge"
 
 if ! command -v secret-tool >/dev/null 2>&1; then
@@ -31,8 +39,9 @@ fi
 
 echo "Issuing one-time pairing code on $HOST ..." >&2
 PAIRING_CODE="$(ssh "$HOST" "$COMPOSE_PREFIX chatgpt-transcribe-connect pair" | sed -n 's/^Pairing code: //p')"
-if [[ -z "$PAIRING_CODE" ]]; then
-  echo "Failed to obtain a pairing code from $HOST" >&2
+# PairingState::issue emits base64url-no-pad of 24 random bytes.
+if [[ ! "$PAIRING_CODE" =~ ^[A-Za-z0-9_-]{16,128}$ ]]; then
+  echo "Failed to obtain a well-formed pairing code from $HOST" >&2
   exit 1
 fi
 

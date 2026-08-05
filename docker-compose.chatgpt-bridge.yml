@@ -26,12 +26,16 @@ services:
       dockerfile: docker/chatgpt-bridge.Dockerfile
     command: ["--listen", "0.0.0.0:37182", "--language", "ru-RU", "serve"]
     environment:
-      HTTP_PROXY: ""
-      HTTPS_PROXY: ""
-      ALL_PROXY: ""
-      http_proxy: ""
-      https_proxy: ""
-      all_proxy: ""
+      # chatgpt.com is geo-blocked from most datacenter ranges (every path answers
+      # 403, including robots.txt), so this daemon is the one service that may need
+      # an egress proxy. Empty by default: no proxy, direct egress, fail-closed.
+      HTTP_PROXY: ${CHATGPT_BRIDGE_EGRESS_PROXY:-}
+      HTTPS_PROXY: ${CHATGPT_BRIDGE_EGRESS_PROXY:-}
+      ALL_PROXY: ${CHATGPT_BRIDGE_EGRESS_PROXY:-}
+      http_proxy: ${CHATGPT_BRIDGE_EGRESS_PROXY:-}
+      https_proxy: ${CHATGPT_BRIDGE_EGRESS_PROXY:-}
+      all_proxy: ${CHATGPT_BRIDGE_EGRESS_PROXY:-}
+      # Sibling services stay direct even when the proxy above is set.
       NO_PROXY: localhost,127.0.0.1,::1,custom-speech,chatgpt-bridge,gateway
       no_proxy: localhost,127.0.0.1,::1,custom-speech,chatgpt-bridge,gateway
     ports:

@@ -338,6 +338,10 @@ def test_chatgpt_bridge_overlay_publishes_loopback_only() -> None:
     assert '"0.0.0.0:37182:37182"' not in bridge_overlay
     assert "chatgpt-bridge:37182" in bridge_overlay
     assert "CHATGPT_BRIDGE_API_TOKEN:-" in bridge_overlay
+    # The bridge is the only service allowed an egress proxy, and only when set explicitly.
+    assert bridge_overlay.count("${CHATGPT_BRIDGE_EGRESS_PROXY:-}") == 6
+    assert "CHATGPT_BRIDGE_EGRESS_PROXY" not in custom_overlay
+    assert "CHATGPT_BRIDGE_EGRESS_PROXY=" in (ROOT / ".env.example").read_text(encoding="utf-8")
     assert "OPENAI_TRANSCRIPTION_API_KEY:-" in custom_overlay
     assert "bridge-up" in switch
     assert "bridge-pair" in switch
