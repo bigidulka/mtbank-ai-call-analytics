@@ -3,7 +3,6 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-import re
 import tomllib
 from pathlib import Path
 
@@ -312,74 +311,6 @@ def test_speech_images_profiles_and_lock_are_staticly_pinned() -> None:
     assert "before container start or CUDA warmup" in runpod_readme
     assert "Docker-ignored" in runpod_readme
     assert "image@sha256" in runpod_readme
-
-
-def test_custom_speech_overlay_is_explicit_no_gpu_backend() -> None:
-    overlay = (ROOT / "docker-compose.custom-speech.yml").read_text(encoding="utf-8")
-    switch = (ROOT / "deploy" / "speech-backend").read_text(encoding="utf-8")
-
-    assert "http://custom-speech:8010" in overlay
-    assert "OPENAI_TRANSCRIPTION_API_KEY" in overlay
-    assert "gpt-5.6-sol" in overlay
-    assert "speech/openai-semantic-vad-v2" in overlay
-    assert "model-egress" in overlay
-    assert "docker-compose.runpod.yml" in switch
-    assert "docker-compose.custom-speech.yml" in switch
-    assert "custom switch verification failed" in switch
-    assert "RunPod switch verification failed" in switch
-
-
-def test_chatgpt_bridge_overlay_publishes_loopback_only() -> None:
-    bridge_overlay = (ROOT / "docker-compose.chatgpt-bridge.yml").read_text(encoding="utf-8")
-    custom_overlay = (ROOT / "docker-compose.custom-speech.yml").read_text(encoding="utf-8")
-    switch = (ROOT / "deploy" / "speech-backend").read_text(encoding="utf-8")
-
-    assert '"127.0.0.1:37182:37182"' in bridge_overlay
-    assert '"0.0.0.0:37182:37182"' not in bridge_overlay
-    assert "chatgpt-bridge:37182" in bridge_overlay
-    assert "CHATGPT_BRIDGE_API_TOKEN:-" in bridge_overlay
-    # The bridge is the only service allowed an egress proxy, and only when set explicitly.
-    assert bridge_overlay.count("${CHATGPT_BRIDGE_EGRESS_PROXY:-}") == 6
-    assert "CHATGPT_BRIDGE_EGRESS_PROXY" not in custom_overlay
-    assert "CHATGPT_BRIDGE_EGRESS_PROXY=" in (ROOT / ".env.example").read_text(encoding="utf-8")
-    assert "OPENAI_TRANSCRIPTION_API_KEY:-" in custom_overlay
-    # The role gateway is overridable on its own, but still defaults to the application gateway
-    # rather than silently resolving to empty.
-    for variable in ("BASE_URL", "API_KEY"):
-        assert (
-            f"${{MTBANK_CUSTOM_SPEECH_ROLE_{variable}:-$MTBANK_AGENT_RUNTIME__GATEWAY__{variable}}}" in custom_overlay
-        )
-        assert f"MTBANK_CUSTOM_SPEECH_ROLE_{variable}=" in (ROOT / ".env.example").read_text(encoding="utf-8")
-    assert "bridge-up" in switch
-    assert "bridge-pair" in switch
-    assert "bridge-token-path" in switch
-    assert "custom-bridge" in switch
-
-
-def test_chatgpt_bridge_migration_script_never_persists_the_credential() -> None:
-    script = (ROOT / "services" / "chatgpt-bridge" / "scripts" / "migrate-local-session.sh").read_text(encoding="utf-8")
-
-    assert "secret-tool lookup service chatgpt-transcribe-connect username chatgpt-web-session" in script
-    assert "/internal/pair" in script
-    assert "chrome-extension://migration" in script
-    # The credential may only ever be read straight into a pipe: never captured into a
-    # shell variable (visible in `ps`/`/proc`), never redirected into a file.
-    assert "$(secret-tool" not in script
-    assert "`secret-tool" not in script
-    for unsafe_pattern in (" > /tmp", "credentials.json"):
-        assert unsafe_pattern not in script
-
-    lookup_line = next(line for line in script.splitlines() if line.startswith("secret-tool lookup"))
-    assert lookup_line.rstrip().endswith("| \\")
-
-    # The only file the script writes on the remote side is the helper, whose body is a
-    # heredoc that reads the credential from stdin and must not embed it.
-    written_files = re.findall(r"tee (\S+)", script)
-    assert written_files == ["/tmp/pair-migrate.py"]
-    helper = script.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
-    assert "secret-tool" not in helper
-    assert "json.load(sys.stdin)" in helper
-    assert f"rm -f {written_files[0]}" in script
 
 
 def test_manifest_is_json_compatible_yaml_for_dependency_free_validation() -> None:

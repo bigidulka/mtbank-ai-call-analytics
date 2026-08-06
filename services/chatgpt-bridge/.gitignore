@@ -1,7 +1,0 @@
-/target
-/.env
-*.log
-credentials.json
-.DS_Store
-extension.zip
-/tmp-*
