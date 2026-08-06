@@ -494,12 +494,21 @@ def _snapshot(
     processing_ms: int,
     settings: CustomSpeechSettings,
 ) -> TranscriptSnapshot:
+    # A role carries exactly one resolution confidence, and the canonical contract requires
+    # every segment of that role to report the same value. Take the role's weakest turn: a role
+    # is only as well established as its least certain evidence. Per-turn certainty is preserved
+    # in speaker_confidence, which the contract does not tie to the assignment.
+    role_confidence = {
+        role: min(turn.confidence for turn in turns if turn.role == role.value)
+        for role in (SpeakerRole.OPERATOR, SpeakerRole.CLIENT)
+        if any(turn.role == role.value for turn in turns)
+    }
     segments = tuple(
         TranscriptSegment(
             id=uuid5(NAMESPACE_URL, f"{audio.audio_sha256}/{pipeline_revision}/{index}"),
             original_speaker_id=_speaker_id(item.role),
             speaker=SpeakerRole(item.role),
-            role_confidence=item.confidence,
+            role_confidence=role_confidence[SpeakerRole(item.role)],
             speaker_confidence=item.confidence,
             start=item.start,
             end=item.end,
@@ -513,13 +522,12 @@ def _snapshot(
         RoleAssignment(
             original_speaker_id=_speaker_id(role.value),
             role=role,
-            confidence=min(turn.confidence for turn in turns if turn.role == role.value),
+            confidence=confidence,
             evidence_segment_ids=tuple(segment.id for segment in segments if segment.speaker is role),
             source=RoleResolutionSource.AGENT,
             resolution_evidence="bounded semantic turn reconstruction",
         )
-        for role in (SpeakerRole.OPERATOR, SpeakerRole.CLIENT)
-        if any(turn.role == role.value for turn in turns)
+        for role, confidence in role_confidence.items()
     )
     return TranscriptSnapshot(
         transcript_id=uuid5(NAMESPACE_URL, f"mtbank-ai/transcript/{audio.audio_sha256}/{pipeline_revision}"),

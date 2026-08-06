@@ -254,6 +254,54 @@ def test_custom_snapshot_preserves_canonical_contract(tmp_path: Path) -> None:
     assert snapshot.asr_metadata.diarization.model_id == "semantic-vad/gpt-5.6-sol"
 
 
+def test_snapshot_survives_a_role_whose_turns_disagree_on_confidence(tmp_path: Path) -> None:
+    settings = _settings()
+    audio_path = tmp_path / "normalized.wav"
+    audio_path.write_bytes(b"RIFF-test")
+    audio = NormalizedAudio(
+        path=audio_path,
+        duration_seconds=6.0,
+        audio_sha256="a" * 64,
+        source_format="wav",
+    )
+    # The operator speaks twice with different certainty; the canonical contract binds one
+    # confidence per role, so both operator segments must report the role's weakest value.
+    turns = (
+        _turn(0, 1, "Оператор", 0.9),
+        _turn(2, 3, "Клиент", 0.8),
+        _turn(4, 5, "Оператор", 0.4),
+    )
+    words = ("добрый", "день", "нужна", "помощь", "уточняю", "детали")
+    anchors = (
+        VadAnchor(start=0.2, end=1.0),
+        VadAnchor(start=1.5, end=2.5),
+        VadAnchor(start=3.0, end=4.5),
+    )
+    aligned = _align_turns(turns, words, anchors, 6.0)
+
+    snapshot = _snapshot(
+        source=SpeechFile(filename="call.wav", content_type="audio/wav", content=b"RIFF-test"),
+        audio=audio,
+        turns=turns,
+        aligned=aligned,
+        provider=None,
+        role_provenance=RoleAgentProvenance(
+            policy_id="flat_transcript_reconstructor",
+            version="v1",
+            owner="MTBank AI Engineering",
+            effective_date="2026-08-04",
+            sha256="b" * 64,
+        ),
+        pipeline_revision=settings.pipeline_revision,
+        processing_ms=1,
+        settings=settings,
+    )
+
+    operator = [segment for segment in snapshot.segments if segment.speaker is SpeakerRole.OPERATOR]
+    assert [segment.role_confidence for segment in operator] == [0.4, 0.4]
+    assert [segment.speaker_confidence for segment in operator] == [0.9, 0.4]
+
+
 def test_custom_runtime_attestation_identifies_experimental_profile() -> None:
     runtime = SemanticVadSpeechRuntime.__new__(SemanticVadSpeechRuntime)
     runtime._settings = _settings()  # pyright: ignore[reportPrivateUsage]
