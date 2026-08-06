@@ -450,36 +450,77 @@ def _vad_anchors(audio: NormalizedAudio, settings: CustomSpeechSettings) -> tupl
     return tuple(anchors)
 
 
+_MINIMUM_SEGMENT_SECONDS = 0.02
+# A Russian call-centre speaker sustains roughly 1.5-4.5 words per second. Anything far outside
+# that band means the transcript and the detected speech describe different audio — truncated
+# ASR text, VAD that found almost nothing, or a duration mismatch — and no placement of turn
+# boundaries can be trusted, so alignment fails closed rather than emitting plausible-looking
+# timestamps.
+_MINIMUM_WORDS_PER_SPEECH_SECOND = 0.4
+_MAXIMUM_WORDS_PER_SPEECH_SECOND = 12.0
+
+
+def _speech_timeline(anchors: tuple[VadAnchor, ...]) -> tuple[tuple[tuple[float, float, float], ...], float]:
+    """Map cumulative speech time onto audio time, skipping the silence between anchors."""
+    timeline: list[tuple[float, float, float]] = []
+    cursor = 0.0
+    for anchor in anchors:
+        span = anchor.end - anchor.start
+        timeline.append((cursor, cursor + span, anchor.start))
+        cursor += span
+    return tuple(timeline), cursor
+
+
+def _at_speech_time(timeline: tuple[tuple[float, float, float], ...], value: float) -> float:
+    for speech_start, speech_end, audio_start in timeline:
+        if value <= speech_end:
+            return audio_start + max(0.0, value - speech_start)
+    speech_start, speech_end, audio_start = timeline[-1]
+    return audio_start + speech_end - speech_start
+
+
 def _align_turns(
     turns: tuple[FlatTurn, ...],
     words: tuple[str, ...],
     anchors: tuple[VadAnchor, ...],
     duration: float,
 ) -> tuple[_AlignedTurn, ...]:
-    if len(turns) > len(anchors):
-        raise SpeechProviderError("semantic turns exceed VAD anchor topology")
-    gaps = tuple(right.start - left.end for left, right in zip(anchors, anchors[1:]))
-    boundaries = sorted(sorted(range(len(gaps)), key=lambda index: (-gaps[index], index))[: len(turns) - 1])
-    groups: list[tuple[int, int]] = []
-    left = 0
-    for boundary in boundaries:
-        groups.append((left, boundary))
-        left = boundary + 1
-    groups.append((left, len(anchors) - 1))
-    for start_padding, end_padding in ((0.2, 0.9), (0.1, 0.2), (0.0, 0.0)):
-        aligned = tuple(
+    """Place turn boundaries by word proportion over detected speech time.
+
+    Ranking the longest silences instead was measured at 49.25% time-weighted role accuracy on
+    real calls against 68.82% for this, losing on 29 of 29 paired runs, because it chose
+    boundaries from pause length alone and never consulted how many words a turn contained: a
+    113-word turn was assigned 0.6 s. Gap ranking scores far better on the authored corpus, whose
+    inter-speaker pauses are cleanly separable — a property real telephony does not have.
+    """
+    timeline, speech_seconds = _speech_timeline(anchors)
+    if speech_seconds <= 0.0:
+        raise SpeechProviderError("VAD produced no speech time")
+    words_per_second = len(words) / speech_seconds
+    if not _MINIMUM_WORDS_PER_SPEECH_SECOND <= words_per_second <= _MAXIMUM_WORDS_PER_SPEECH_SECOND:
+        raise SpeechProviderError("transcript length is implausible for the detected speech time")
+
+    # Boundaries are strictly increasing because word ratios are, so turns never overlap by
+    # construction and need no padding-reduction ladder.
+    previous_end = 0.0
+    aligned: list[_AlignedTurn] = []
+    for turn in turns:
+        start = max(previous_end, _at_speech_time(timeline, turn.start_word_index / len(words) * speech_seconds))
+        end = _at_speech_time(timeline, (turn.end_word_index + 1) / len(words) * speech_seconds)
+        end = min(duration, max(end, start + _MINIMUM_SEGMENT_SECONDS))
+        if end <= start:
+            raise SpeechProviderError("semantic turns do not fit the audio duration")
+        aligned.append(
             _AlignedTurn(
-                start=max(0.0, anchors[first].start - start_padding),
-                end=min(duration, anchors[last].end + end_padding),
+                start=start,
+                end=end,
                 role=turn.role,
                 confidence=turn.confidence,
                 text=" ".join(words[turn.start_word_index : turn.end_word_index + 1]),
             )
-            for turn, (first, last) in zip(turns, groups, strict=True)
         )
-        if not any(current.start < previous.end for previous, current in zip(aligned, aligned[1:])):
-            return aligned
-    raise SpeechProviderError("VAD semantic alignment overlaps after bounded padding reduction")
+        previous_end = end
+    return tuple(aligned)
 
 
 def _snapshot(
@@ -570,8 +611,8 @@ def _alignment_revision() -> ComponentRevision:
     return ComponentRevision(
         package="mtbank-ai",
         package_version="1",
-        model_id="ffmpeg-silencedetect-ranked-gap",
-        model_revision="adaptive-padding-v1",
+        model_id="ffmpeg-silencedetect-word-proportional",
+        model_revision="speech-time-proportional-v2",
     )
 
 

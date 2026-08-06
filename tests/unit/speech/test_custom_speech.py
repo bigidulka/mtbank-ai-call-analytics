@@ -96,7 +96,7 @@ def test_bridge_transcription_is_attested_as_the_bridge_not_an_official_provider
     settings = _settings().model_copy(
         update={
             "asr_endpoint": TypeAdapter(HttpUrl).validate_python("http://chatgpt-bridge:37182/v1/audio/transcriptions"),
-            "pipeline_revision": "speech/chatgpt-bridge-semantic-vad-v1",
+            "pipeline_revision": "speech/chatgpt-bridge-semantic-vad-v2",
         }
     )
     transcriber = OpenAiFlatTranscriber(
@@ -185,25 +185,42 @@ def test_semantic_role_resolver_stops_at_the_attempt_budget() -> None:
     assert attempts == 2
 
 
-def test_adaptive_vad_alignment_reduces_padding_without_overlap() -> None:
+def test_vad_alignment_splits_by_word_proportion_over_speech_time() -> None:
     turns = (
         _turn(0, 1, "Оператор"),
         _turn(2, 3, "Клиент"),
     )
+    # 1.2 s of speech across two anchors; each turn holds half the words, so each takes 0.6 s
+    # of speech time. The second turn starts inside the first anchor and continues after the
+    # silence, which is why its span crosses the gap.
     anchors = (VadAnchor(start=0.5, end=1.0), VadAnchor(start=1.3, end=2.0))
 
     aligned = _align_turns(turns, ("добрый", "день", "нужна", "помощь"), anchors, 3.0)
 
-    assert [(item.start, item.end) for item in aligned] == [(0.4, 1.2), (1.2, 2.2)]
+    assert [(round(item.start, 3), round(item.end, 3)) for item in aligned] == [(0.5, 1.4), (1.4, 2.0)]
     assert [item.role for item in aligned] == ["Оператор", "Клиент"]
     assert [item.text for item in aligned] == ["добрый день", "нужна помощь"]
 
 
-def test_vad_alignment_fails_closed_when_turn_topology_exceeds_anchors() -> None:
-    turns = (_turn(0, 0, "Оператор"), _turn(1, 1, "Клиент"))
+def test_vad_alignment_accepts_more_turns_than_anchors() -> None:
+    # Rapid back-and-forth inside one breath group produces more turns than silence-delimited
+    # regions. Proportional placement needs no anchor per turn, so this must not fail.
+    turns = (_turn(0, 0, "Оператор"), _turn(1, 1, "Клиент"), _turn(2, 2, "Оператор"))
 
-    with pytest.raises(SpeechProviderError, match="exceed VAD anchor topology"):
-        _align_turns(turns, ("да", "нет"), (VadAnchor(start=0.0, end=1.0),), 1.0)
+    aligned = _align_turns(turns, ("да", "нет", "ага"), (VadAnchor(start=0.0, end=1.5),), 1.5)
+
+    assert len(aligned) == 3
+    assert [item.role for item in aligned] == ["Оператор", "Клиент", "Оператор"]
+    assert all(later.start >= earlier.end for earlier, later in zip(aligned, aligned[1:]))
+
+
+def test_vad_alignment_fails_closed_when_transcript_cannot_fit_the_speech_time() -> None:
+    # 400 words against 1 s of detected speech: the transcript and the audio disagree, so no
+    # boundary placement is trustworthy.
+    turns = (_turn(0, 399, "Оператор"),)
+
+    with pytest.raises(SpeechProviderError, match="implausible for the detected speech"):
+        _align_turns(turns, tuple(f"слово{index}" for index in range(400)), (VadAnchor(start=0.0, end=1.0),), 1.0)
 
 
 def test_semantic_turn_coverage_rejects_gap() -> None:
@@ -247,7 +264,7 @@ def test_custom_snapshot_preserves_canonical_contract(tmp_path: Path) -> None:
         settings=settings,
     )
 
-    assert snapshot.revision == "speech/openai-semantic-vad-v1"
+    assert snapshot.revision == "speech/openai-semantic-vad-v2"
     assert [segment.speaker for segment in snapshot.segments] == [SpeakerRole.OPERATOR, SpeakerRole.CLIENT]
     assert snapshot.role_resolution.needs_review is True
     assert snapshot.asr_metadata.asr.model_id == "gpt-4o-transcribe"

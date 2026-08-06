@@ -321,7 +321,7 @@ def test_custom_speech_overlay_is_explicit_no_gpu_backend() -> None:
     assert "http://custom-speech:8010" in overlay
     assert "OPENAI_TRANSCRIPTION_API_KEY" in overlay
     assert "gpt-5.6-sol" in overlay
-    assert "speech/openai-semantic-vad-v1" in overlay
+    assert "speech/openai-semantic-vad-v2" in overlay
     assert "model-egress" in overlay
     assert "docker-compose.runpod.yml" in switch
     assert "docker-compose.custom-speech.yml" in switch

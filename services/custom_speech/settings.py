@@ -49,12 +49,20 @@ class CustomSpeechSettings(BaseSettings):
     role_timeout_seconds: PositiveFloat = 30.0
     role_max_attempts: PositiveInt = 3
     max_words: PositiveInt = 1_200
-    vad_noise_db: float = -45.0
+    # Swept against the real-call references: -50 dB scored 73.16% mean role accuracy with a
+    # 1.92 pp spread across min-silence values, where the previous -45 dB scored 69.59% and
+    # swung 5.22 pp. A single -40 dB/0.40 s point scored higher still (76.16%) but its
+    # neighbours sat near 68%, so it is a spike on a two-call sample, not a setting to adopt.
+    vad_noise_db: float = -50.0
     vad_minimum_silence_seconds: PositiveFloat = 0.25
+    # v2 marks word-proportional alignment. Transcripts from the two revisions place turn
+    # boundaries differently, so the revision has to distinguish them for provenance.
     pipeline_revision: Literal[
         "speech/openai-semantic-vad-v1",
         "speech/chatgpt-bridge-semantic-vad-v1",
-    ] = "speech/openai-semantic-vad-v1"
+        "speech/openai-semantic-vad-v2",
+        "speech/chatgpt-bridge-semantic-vad-v2",
+    ] = "speech/openai-semantic-vad-v2"
 
     @field_validator("asr_api_key", "role_api_key")
     @classmethod

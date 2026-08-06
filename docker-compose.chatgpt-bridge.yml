@@ -15,7 +15,7 @@ services:
       MTBANK_CUSTOM_SPEECH__ASR_API_KEY: ${CHATGPT_BRIDGE_API_TOKEN:-}
       MTBANK_CUSTOM_SPEECH__ASR_ENDPOINT: http://chatgpt-bridge:37182/v1/audio/transcriptions
       MTBANK_CUSTOM_SPEECH__ASR_MODEL: gpt-4o-transcribe
-      MTBANK_CUSTOM_SPEECH__PIPELINE_REVISION: speech/chatgpt-bridge-semantic-vad-v1
+      MTBANK_CUSTOM_SPEECH__PIPELINE_REVISION: speech/chatgpt-bridge-semantic-vad-v2
       NO_PROXY: localhost,127.0.0.1,::1,custom-speech,chatgpt-bridge,gateway
       no_proxy: localhost,127.0.0.1,::1,custom-speech,chatgpt-bridge,gateway
 
