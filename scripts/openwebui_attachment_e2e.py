@@ -293,9 +293,14 @@ def _assert_gateway_rejects_oversized_upload() -> None:
 
 
 def _extract_analysis(content: str) -> AnalyzeResponse:
-    match = re.search(r"<pre>(.*?)</pre>", content, flags=re.DOTALL)
+    # The Pipeline renders a readable report and carries the canonical DTO in a fenced JSON
+    # block inside the collapsed technical section. It emitted a bare <pre> block until the
+    # readable renderer landed, so accept both rather than tie this check to presentation.
+    match = re.search(r"<details>.*?```json\s*\n(.*?)\n```.*?</details>", content, flags=re.DOTALL)
     if match is None:
-        raise RuntimeError("production Pipeline output не содержит canonical JSON в <pre>")
+        match = re.search(r"<pre>(.*?)</pre>", content, flags=re.DOTALL)
+    if match is None:
+        raise RuntimeError("production Pipeline output не содержит canonical JSON")
     try:
         payload = json.loads(html.unescape(match.group(1)))
     except json.JSONDecodeError as error:
