@@ -16,7 +16,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE_URL = os.getenv("OPENWEBUI_E2E_URL", "https://mtbank.arbitron.dev").rstrip("/")
+BASE_URL = os.getenv("OPENWEBUI_E2E_URL", "http://127.0.0.1:3000").rstrip("/")
 MODEL_ID = "mtbank-attachment-probe"
 TIMEOUT_SECONDS = 300
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024

@@ -4,22 +4,10 @@ AI-система для транскрибации и многоагентно�
 
 [![CI](https://github.com/bigidulka/mtbank-ai-call-analytics/actions/workflows/ci.yml/badge.svg)](https://github.com/bigidulka/mtbank-ai-call-analytics/actions/workflows/ci.yml)
 
-- **OpenWebUI demo:** https://mtbank.arbitron.dev
-- **Grafana:** https://mtbank.arbitron.dev/grafana/
 - **Исходное ТЗ:** [`docs/assignment.md`](docs/assignment.md)
 - **Машинно-читаемые результаты:** [`release-evidence/final-115/`](release-evidence/final-115/)
 
-Демо защищено от свободной регистрации. Рекрутеру передаются отдельные временные OpenWebUI и read-only Grafana credentials вместе со ссылками; secrets не публикуются в Git.
-
-## Быстрая проверка
-
-0. Войти временными evaluator credentials из сообщения со ссылкой.
-1. Открыть [публичный OpenWebUI](https://mtbank.arbitron.dev).
-2. Выбрать модель **MTBank Attachment Probe**.
-3. Написать текстовый вопрос — отдельный bounded multi-turn LLM-agent сам выберет safe read-only tools и отдаст ответ token-by-token с учётом истории диалога.
-4. Загрузить [`test_data/synthetic/mobile-app-security-16k.ogg`](test_data/synthetic/mobile-app-security-16k.ogg).
-5. Получить единый результат: transcript с timestamps и ролями, classification, quality checklist, compliance, summary, action items.
-6. Открыть [Grafana](https://mtbank.arbitron.dev/grafana/) для метрик звонков, качества и тематик.
+Демо остановлено. Локальный запуск — см. [`docs/operations.md`](docs/operations.md).
 
 ## Архитектура
 
@@ -103,7 +91,7 @@ WebSocket partials создаются bounded rolling GPU windows; финаль�
 ## REST API
 
 ```bash
-curl -X POST https://mtbank.arbitron.dev/analyze \
+curl -X POST http://127.0.0.1:8000/analyze \
   -H "Authorization: Bearer $MTBANK_API_KEY" \
   -F "file=@test_data/synthetic/mobile-app-security-16k.ogg"
 ```
