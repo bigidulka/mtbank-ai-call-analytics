@@ -29,8 +29,8 @@ prompt, model and code revisions is required for reproducibility.
   Trends allows one reviewed-topic query and suppresses cohorts below privacy threshold.
 - PostgreSQL persistence and release evidence exclude raw content. Evidence hashes
   provider request IDs rather than retaining them.
-- CI does not print secrets and scheduled real E2E fails closed when secrets/config are
-  absent.
+- CI does not print secrets and the on-demand real E2E workflow fails closed when
+  secrets/config are absent.
 
 ## Residual risks and release decisions
 

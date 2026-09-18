@@ -1,8 +1,8 @@
 name: Real E2E evidence
 
+# Runs on demand only: the release gate needs a configured gateway and a deployed
+# environment, and it fails closed (never silently skips) when they are absent.
 on:
-  schedule:
-    - cron: "23 3 * * 1"
   workflow_dispatch:
 
 permissions:
